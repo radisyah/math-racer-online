@@ -461,7 +461,7 @@
       const r = (a, b) => a + Math.floor(RNG() * (b - a + 1)),
         pick = (a) => a[r(0, a.length - 1)];
       // ---- Generator soal aritmatika: + − × ÷ dengan urutan operasi biasa
-      // Lv1 = 2 suku, Lv2 = 3 suku, Lv3 = 4 suku. Hasil selalu bilangan bulat >= 0.
+      // Lv1 = 2 suku, Lv2 = 3 suku, Lv3 = 4 suku. Hasil selalu bilangan bulat >= 0. Lv2/Lv3 juga memuat soal berkurung.
       const NTERM = [2, 3, 4];
       const divisorsOf = (v) => {
         const d = [];
@@ -512,7 +512,95 @@
         }
         return ["12 + 8 = ?", 20];
       }
-      const gens = NTERM.map((n) => () => arithQ(n));
+      // ---- Soal berkurung (khusus Lv2 & Lv3), dibuat dari template agar hasil selalu bulat
+      // sumP: "x ± y" yang bernilai tepat v (x, y > 0)
+      function sumP(v) {
+        if (v >= 2 && RNG() < 0.5) {
+          const x = r(1, v - 1);
+          return { t: `${x} + ${v - x}`, v };
+        }
+        const y = r(1, 15);
+        return { t: `${v + y} − ${y}`, v };
+      }
+      // tambah/kurang satu suku di belakang; hasil tidak negatif
+      function tail(base) {
+        if (RNG() < 0.5) return ["+", r(2, 30)];
+        return ["−", r(1, Math.min(base, 30))];
+      }
+      const parenGens = {
+        2: [
+          // (a ± b) × c
+          () => {
+            const S = sumP(r(2, 15)), c = r(2, 9);
+            return [`(${S.t}) × ${c}`, S.v * c];
+          },
+          // a × (b ± c)
+          () => {
+            const S = sumP(r(2, 15)), a = r(2, 9);
+            return [`${a} × (${S.t})`, a * S.v];
+          },
+          // (a ± b) ÷ c
+          () => {
+            const c = r(2, 9), k = r(2, 12), S = sumP(c * k);
+            return [`(${S.t}) ÷ ${c}`, k];
+          },
+          // a ÷ (b ± c)
+          () => {
+            const s = r(2, 9), k = r(2, 12), S = sumP(s);
+            return [`${s * k} ÷ (${S.t})`, k];
+          },
+        ],
+        3: [
+          // (a ± b) × (c ± d)
+          () => {
+            const A = sumP(r(2, 9)), B = sumP(r(2, 9));
+            return [`(${A.t}) × (${B.t})`, A.v * B.v];
+          },
+          // (a ± b) × c ± d
+          () => {
+            const A = sumP(r(2, 12)), c = r(2, 9), p = A.v * c, [o, d] = tail(p);
+            return [`(${A.t}) × ${c} ${o} ${d}`, o === "+" ? p + d : p - d];
+          },
+          // a ± (b ± c) × d
+          () => {
+            const A = sumP(r(2, 9)), c = r(2, 9), p = A.v * c;
+            if (RNG() < 0.5) {
+              const a = r(5, 40);
+              return [`${a} + (${A.t}) × ${c}`, a + p];
+            }
+            const a = p + r(1, 20);
+            return [`${a} − (${A.t}) × ${c}`, a - p];
+          },
+          // (a ± b) ÷ c ± d
+          () => {
+            const c = r(2, 9), k = r(2, 12), S = sumP(c * k), [o, d] = tail(k);
+            return [`(${S.t}) ÷ ${c} ${o} ${d}`, o === "+" ? k + d : k - d];
+          },
+          // (a ± b ± c) × d
+          () => {
+            const A = sumP(r(3, 12)), plus = RNG() < 0.5;
+            const z = plus ? r(1, 9) : r(1, A.v - 1);
+            const v = plus ? A.v + z : A.v - z, d = r(2, 9);
+            return [`(${A.t} ${plus ? "+" : "−"} ${z}) × ${d}`, v * d];
+          },
+          // a ÷ (b ± c) ± d
+          () => {
+            const s = r(2, 9), k = r(2, 12), S = sumP(s), [o, d] = tail(k);
+            return [`${s * k} ÷ (${S.t}) ${o} ${d}`, o === "+" ? k + d : k - d];
+          },
+        ],
+      };
+      function genLevel(n) {
+        // Lv2 & Lv3: ±50% soal berkurung, sisanya soal biasa
+        if (n >= 3 && RNG() < 0.5) {
+          for (let i = 0; i < 20; i++) {
+            const [t, a] = pick(parenGens[n - 1])();
+            if (a >= 0 && a <= 999) return [t + " = ?", a];
+          }
+        }
+        return arithQ(n);
+      }
+      const gens = NTERM.map((n) => () => genLevel(n));
       // ---- 2D renderer (Canvas 2D, tanpa library)
       const DESIGNS = [
         {
