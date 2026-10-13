@@ -460,82 +460,59 @@
       let RNG = Math.random;
       const r = (a, b) => a + Math.floor(RNG() * (b - a + 1)),
         pick = (a) => a[r(0, a.length - 1)];
-      const gens = [
-        () =>
-          pick([
-            () => {
-              let a = r(3, 12),
-                b = r(3, 12);
-              return [`${a} × ${b} = ?`, a * b];
-            },
-            () => {
-              let p = pick([10, 20, 25, 50]),
-                n = r(1, 10) * 20;
-              return [`${p}% dari ${n} = ?`, (n * p) / 100];
-            },
-            () => {
-              let a = r(2, 15),
-                b = r(a + 1, 25);
-              return [`−${b} + ${a} = ?`, a - b];
-            },
-            () => {
-              let a = r(2, 9),
-                b = r(2, 9);
-              return [`${a} × (−${b}) = ?`, -a * b];
-            },
-          ])(),
-        () =>
-          pick([
-            () => {
-              let v = r(2, 12),
-                a = r(2, 6),
-                b = r(1, 15);
-              return [`${a}x + ${b} = ${a * v + b} → x = ?`, v];
-            },
-            () => {
-              let t = pick([
-                [3, 4, 5],
-                [5, 12, 13],
-                [8, 15, 17],
-                [6, 8, 10],
-              ]);
-              return [`Sisi tegak ${t[0]} & ${t[1]}, sisi miring = ?`, t[2]];
-            },
-            () => {
-              let n = r(3, 7);
-              return [`2^${n} = ?`, 2 ** n];
-            },
-            () => {
-              let n = r(4, 15);
-              return [`√${n * n} = ?`, n];
-            },
-          ])(),
-        () =>
-          pick([
-            () => {
-              let n = r(3, 6);
-              return [`²log ${2 ** n} = ?`, n];
-            },
-            () => {
-              let a = r(2, 5),
-                b = r(2, 6);
-              return [`f(x)=${a}x², f'(${b}) = ?`, 2 * a * b];
-            },
-            () => {
-              let n = r(5, 12);
-              return [`Suku ke-${n} barisan 3, 7, 11, … = ?`, 3 + 4 * (n - 1)];
-            },
-            () => {
-              let k = r(2, 9) * 2;
-              return [`sin 30° × ${k * 2} = ?`, k];
-            },
-            () => {
-              let a = r(2, 9),
-                d = r(2, 5);
-              return [`Rata-rata ${a}, ${a + d}, ${a + 2 * d} = ?`, a + d];
-            },
-          ])(),
-      ];
+      // ---- Generator soal aritmatika: + − × ÷ dengan urutan operasi biasa
+      // Lv1 = 2 suku, Lv2 = 3 suku, Lv3 = 4 suku. Hasil selalu bilangan bulat >= 0.
+      const NTERM = [2, 3, 4];
+      const divisorsOf = (v) => {
+        const d = [];
+        for (let i = 2; i <= 12; i++) if (v % i === 0) d.push(i);
+        return d;
+      };
+      function arithQ(n) {
+        for (let tries = 0; tries < 200; tries++) {
+          // pilih operator di antara suku-suku
+          const ops = [];
+          for (let i = 0; i < n - 1; i++) ops.push(pick(["+", "−", "×", "÷"]));
+          // bagi menjadi kelompok tambah/kurang; tiap kelompok = rantai × ÷
+          const groups = [];
+          let cur = { sign: 1, ops: [] };
+          groups.push(cur);
+          ops.forEach((o) => {
+            if (o === "+" || o === "−") {
+              cur = { sign: o === "+" ? 1 : -1, ops: [] };
+              groups.push(cur);
+            } else cur.ops.push(o);
+          });
+          let total = 0,
+            parts = [];
+          groups.forEach((g, gi) => {
+            const alone = g.ops.length === 0;
+            let v = alone ? r(5, n === 2 ? 99 : 50) : r(2, 12);
+            let txt = [String(v)];
+            g.ops.forEach((o) => {
+              if (o === "÷") {
+                const d = divisorsOf(v);
+                if (d.length) {
+                  const b = pick(d);
+                  v /= b;
+                  txt.push("÷", String(b));
+                  return;
+                }
+                o = "×"; // tidak bisa dibagi habis → ganti perkalian
+              }
+              const b = r(2, 9);
+              v *= b;
+              txt.push("×", String(b));
+            });
+            if (gi > 0) parts.push(g.sign > 0 ? "+" : "−");
+            parts.push(txt.join(" "));
+            total += g.sign * v;
+          });
+          if (total >= 0 && total <= 999) return [parts.join(" ") + " = ?", total];
+        }
+        return ["12 + 8 = ?", 20];
+      }
+      const gens = NTERM.map((n) => () => arithQ(n));
       // ---- 2D renderer (Canvas 2D, tanpa library)
       const DESIGNS = [
         {
@@ -1208,7 +1185,7 @@
         let o = [a];
         while (o.length < 3) {
           let d = a + r(-7, 7);
-          if (d !== a && !o.includes(d)) o.push(d);
+          if (d !== a && !o.includes(d) && (a < 0 || d >= 0)) o.push(d);
         }
         for (let i = 2; i > 0; i--) {
           const j = Math.floor(RNG() * (i + 1));
@@ -1232,9 +1209,9 @@
               }</span><small>${d.sub}</small></div>`
           ).join("")}</div>` +
           `<h3>LEVEL (ditentukan pembuat room)</h3><div class="lvs">${[
-            "Lv1 · 12-13",
-            "Lv2 · 14-15",
-            "Lv3 · 16-17",
+            "Lv1 · 2 suku",
+            "Lv2 · 3 suku",
+            "Lv3 · 4 suku",
           ]
             .map(
               (t, i) =>
