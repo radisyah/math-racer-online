@@ -435,7 +435,7 @@
         <div id="ov"></div>
       </div>
       <div class="hint">
-        Soal yang sama untuk kedua pemain · adu cepat dan teliti!
+        Soal yang sama untuk kedua pemain · menang dengan skor tertinggi (teliti + cepat)!
       </div>
     </div>
     <script src="net.js"></script>
@@ -443,6 +443,12 @@
       const GAP = 700,
         VMAX = 64, // m/s ≈ 230 km/h
         VNIT = 96, // m/s ≈ 345 km/h saat nitro
+        // ---- aturan skor (dihitung lokal di tiap perangkat, bebas jeda jaringan)
+        PTS_OK = 100, // poin tiap jawaban benar
+        PTS_BAD = 50, // pengurang tiap jawaban salah (membuat asal tebak tidak menguntungkan)
+        SPD_BONUS = 60, // bonus kecepatan maksimum, hanya untuk jawaban benar
+        FAST_T = 9, // detik antar gerbang: <= ini dapat bonus penuh
+        SLOW_T = 30, // detik antar gerbang: >= ini bonus 0
         NG = 10,
         FIN = GAP * NG + 200,
         LEN = FIN + 400,
@@ -748,7 +754,7 @@
         $("wrap").style.width = W + "px";
         $("wrap").style.height = H + "px";
       }
-      function drawScene(d, lx, lane, sp, br, opp) {
+      function drawScene(d, lx, lane, sp, br) {
         const c = cx;
         c.setTransform(DPR, 0, 0, DPR, 0, 0);
         // kamera sedikit mundur saat ngebut agar jalan di depan lebih terlihat
@@ -931,62 +937,6 @@
           c.fillStyle = "#fff";
           c.fillText(cap, W / 2, y0 + 31);
         }
-        // mobil lawan (online)
-        if (opp) {
-          const oy = yOf(opp.d),
-            ow = LP * 0.46,
-            ol = ow * 2.1,
-            ox = RX + (opp.lx + 0.5) * LP;
-          if (oy > TOPY - ol && oy < H + ol) {
-            c.save();
-            c.translate(ox, oy);
-            c.rotate((opp.ln - opp.lx) * 0.35);
-            c.fillStyle = "rgba(0,0,0,.25)";
-            rr(c, -ow / 2 + 4, -ol / 2 + 6, ow, ol, 10);
-            c.fill();
-            if (opp.sp > VMAX * 1.03) {
-              c.globalCompositeOperation = "lighter";
-              drawFlame(c, ow, ol);
-              c.globalCompositeOperation = "source-over";
-            }
-            drawCar(c, opp.car || 0, ow, ol, {});
-            c.restore();
-            c.font = "800 11px system-ui,Arial,sans-serif";
-            c.textAlign = "center";
-            c.textBaseline = "bottom";
-            c.fillStyle = COL[1];
-            c.strokeStyle = "rgba(0,0,0,.75)";
-            c.lineWidth = 3;
-            c.strokeText("LAWAN", ox, oy - ol / 2 - 3);
-            c.fillText("LAWAN", ox, oy - ol / 2 - 3);
-          } else {
-            const ahead = oy <= TOPY - ol,
-              gapm = Math.round(Math.abs(opp.d - d)),
-              ay = ahead ? TOPY + 8 : H - 46;
-            c.fillStyle = COL[1];
-            c.beginPath();
-            if (ahead) {
-              c.moveTo(ox, ay);
-              c.lineTo(ox - 11, ay + 16);
-              c.lineTo(ox + 11, ay + 16);
-            } else {
-              c.moveTo(ox, ay + 16);
-              c.lineTo(ox - 11, ay);
-              c.lineTo(ox + 11, ay);
-            }
-            c.closePath();
-            c.fill();
-            c.font = "800 12px system-ui,Arial,sans-serif";
-            c.textAlign = "center";
-            c.textBaseline = ahead ? "top" : "bottom";
-            c.lineWidth = 3;
-            c.strokeStyle = "rgba(0,0,0,.75)";
-            const t = (ahead ? "LAWAN +" : "LAWAN -") + gapm + " m";
-            const ty = ahead ? ay + 18 : ay - 2;
-            c.strokeText(t, ox, ty);
-            c.fillText(t, ox, ty);
-          }
-        }
         // mobil
         const cw = LP * 0.46,
           cl = cw * 2.1,
@@ -1014,8 +964,7 @@
           p ? p.lx : 1,
           p ? p.lane : 1,
           p ? p.sp : 0,
-          p ? p.br : false,
-          null
+          p ? p.br : false
         );
       }
       function makeThumbs() {
@@ -1217,11 +1166,14 @@
         K = {},
         Q = [],
         me = null,
-        op = { d: 0, sp: 0, lx: 1, ln: 1, car: 1 },
+        oppFinal = null,
+        lastSent = "",
+        lastWg = "",
         lastNet = 0,
         lastSeen = 0;
       const mk = () => ({
         nit: 0,
+        gT: 0,
         d: 0,
         sp: 0,
         lane: 1,
@@ -1270,7 +1222,7 @@
         const o = $("ov");
         o.style.display = "flex";
         o.innerHTML =
-          `<div class="in"><div style="font-size:30px">🏎️💨🏎️</div><details><summary>Cara bermain</summary><p>Balapan online 1 lawan 1! Kamu hanya melihat mobilmu sendiri, tapi <b>progres & jarak kedua mobil</b> tampil di atas layar. Masuk ke jalur yang papan jawabannya benar untuk dapat NITRO; salah = melambat. Yang sampai finish duluan menang.<br>Tunggu aba-aba <b>3-2-1-GO!</b><br><b>A/D</b> pindah jalur · <b>W</b> gas · <b>S</b> rem lalu mundur<br>(HP: tap jalur untuk pindah; gas/rem perlu keyboard)</p></details>` +
+          `<div class="in"><div style="font-size:30px">🏎️💨🏎️</div><details><summary>Cara bermain</summary><p>Balapan online 1 lawan 1! Kedua pemain menjawab <b>soal yang sama</b>, mobil lawan tidak terlihat. Masuk ke jalur yang papan jawabannya benar untuk dapat NITRO; salah = melambat. Skor: <b>benar +100</b> (plus bonus sampai +60 bila cepat), <b>salah −50</b>, jadi asal tebak tidak untung. Setelah kedua pemain finish, <b>skor tertinggi menang</b>.<br>Tunggu aba-aba <b>3-2-1-GO!</b><br><b>A/D</b> pindah jalur · <b>W</b> gas · <b>S</b> rem lalu mundur<br>(HP: tap jalur untuk pindah; gas/rem perlu keyboard)</p></details>` +
           `<h3>PILIH MOBILMU</h3><div class="row3">${DESIGNS.map(
             (d, k) =>
               `<div class="card${SEL[0] === k ? " on" : ""}" style="--c:${
@@ -1482,14 +1434,16 @@
         Q = Array.from({ length: NG }, mkQ);
         RNG = Math.random;
         me = mk();
-        op = { d: 0, sp: 0, lx: 1, ln: 1, car: 1 };
+        oppFinal = null;
+        lastSent = "";
+        lastWg = "";
         T = 0;
         cd = 3;
         cdn = 4;
         goT = 0;
         $("cd").textContent = "";
         $("p0").textContent = "WASD · " + DESIGNS[SEL[0]].name;
-        $("rowo").style.display = ROLE === "solo" ? "none" : "flex";
+        $("rowo").style.display = "none"; // lawan tidak terlihat
         $("ov").style.display = "none";
         phase = "race";
         run = true;
@@ -1497,12 +1451,10 @@
         lastNet = 0;
         lastSeen = last;
         showQ();
-        if (ROOM && ROLE !== "solo") ROOM.hot(true);
+        if (ROOM && ROLE !== "solo") ROOM.hot(false); // posisi lawan tidak dipakai, cukup polling santai
         if (ROOM && ROLE !== "solo")
           ROOM.presence({
             round: ROUND,
-            d: 0,
-            sp: 0,
             gi: 0,
             ok: 0,
             sc: 0,
@@ -1547,7 +1499,6 @@
         const dt = Math.min((n - last) / 1000, 0.05);
         last = n;
         upd(dt);
-        readOpp(dt);
         net(n);
         check(n);
         if (run) frame(dt);
@@ -1575,8 +1526,9 @@
         }
         T += dt;
         const p = me,
-          g = K.w || K.arrowup,
-          b = K.s || K.arrowdown;
+          fin = p.t !== null,
+          g = !fin && (K.w || K.arrowup),
+          b = !fin && (K.s || K.arrowdown);
         p.lx += (p.lane - p.lx) * Math.min(1, dt * 13);
         p.brp = p.br;
         p.br = false;
@@ -1600,6 +1552,10 @@
         const top = p.nit > 0 ? VNIT : VMAX;
         if (p.sp > top) p.sp -= Math.min(p.sp - top, 22 * dt);
         if (p.sp < -12) p.sp = -12;
+        if (fin) {
+          p.nit = 0;
+          p.sp = Math.max(0, p.sp - 34 * dt); // mobil berhenti perlahan setelah finish
+        }
         const o = p.d;
         p.d = Math.max(0, p.d + p.sp * dt);
         if (p.d === 0 && p.sp < 0) p.sp = 0;
@@ -1612,8 +1568,12 @@
             p.sp = Math.min(VNIT, p.sp + 16);
             p.st++;
             p.ok++;
-            p.sc += 100 + p.st * 20;
-            p.msg = "NITRO! 🔥";
+            const seg = T - p.gT,
+              bonus = Math.round(
+                SPD_BONUS * Math.max(0, Math.min(1, (SLOW_T - seg) / (SLOW_T - FAST_T)))
+              );
+            p.sc += PTS_OK + bonus;
+            p.msg = "NITRO! 🔥 +" + (PTS_OK + bonus);
             p.mc = COL[0];
             SFX.ok(-1);
             SFX.nitro(-1);
@@ -1622,42 +1582,52 @@
             p.nit = 0;
             p.sp = Math.min(p.sp, 10);
             p.st = 0;
-            p.msg = "Salah! = " + q.o[q.cl];
+            p.sc -= PTS_BAD;
+            p.msg = "Salah! −" + PTS_BAD + " · jawaban " + q.o[q.cl];
             p.mc = "#ff5577";
           }
           p.mt = 1.5;
+          p.gT = T;
           p.gi++;
           showQ();
         }
         if (p.d >= FIN && p.t === null) p.t = T;
       }
-      function readOpp(dt) {
-        const pe = oppPeer(),
-          pr = pe && pe.presence;
-        if (pr && pr.round === ROUND) {
-          op.sp = pr.sp || 0;
-          if (pr.car != null) op.car = pr.car;
-          op.ln = pr.ln != null ? pr.ln : 1;
-          op.lx += (op.ln - op.lx) * Math.min(1, dt * 9);
-          const age = Math.min(0.8, Math.max(0, (performance.now() - (pe.at || 0)) / 1000));
-          op.d +=
-            ((pr.d || 0) + op.sp * (age + 0.12) - op.d) * Math.min(1, dt * 8);
-          if (pr.ft != null) op.d = FIN;
-        }
+      // Pemenang: skor tertinggi (benar +100 & bonus cepat, salah -50). Seri skor: jawaban benar
+      // terbanyak, lalu waktu tercepat; selisih waktu < 0,05 dtk = seri.
+      function judge(a, b) {
+        if (a.sc !== b.sc) return a.sc > b.sc ? "win" : "lose";
+        if (a.ok !== b.ok) return a.ok > b.ok ? "win" : "lose";
+        if (Math.abs(a.t - b.t) < 0.05) return "draw";
+        return a.t < b.t ? "win" : "lose";
       }
+      // Kirim hanya data yang berubah (per gerbang & saat finish), bukan posisi tiap frame.
       function net(n) {
-        if (!ROOM || ROLE === "solo" || n - lastNet < 80) return;
+        if (!ROOM || ROLE === "solo" || n - lastNet < 200) return;
         lastNet = n;
+        const k = me.gi + "|" + me.ok + "|" + me.sc + "|" + (me.t === null ? "" : me.t);
+        if (k === lastSent) return;
+        lastSent = k;
         ROOM.presence({
           round: ROUND,
-          d: +me.d.toFixed(1),
-          sp: +me.sp.toFixed(1),
-          ln: me.lane,
           gi: me.gi,
           ok: me.ok,
           sc: me.sc,
           ft: me.t,
         }).catch(() => {});
+      }
+      function showFinishWait(pr) {
+        const gi = pr && pr.gi != null ? pr.gi : 0,
+          txt = `Lawan sudah menjawab ${gi}/${NG} soal…`;
+        if (!$("wg")) {
+          lastWg = "";
+          $("ov").style.display = "flex";
+          $("ov").innerHTML = `<div class="in"><div style="font-size:38px">🏁</div><h3>KAMU SUDAH FINISH!</h3><p>Skor kamu: <b>${me.sc}</b> · Benar ${me.ok}/${NG} · Waktu ${me.t.toFixed(1)} detik<br><span id="wg"></span></p><p>Pemenang = skor tertinggi (benar + cepat, salah dikurangi).</p><button class="alt" onclick="leaveRoom()">Keluar ke menu</button></div>`;
+        }
+        if (txt !== lastWg) {
+          lastWg = txt;
+          $("wg").textContent = "Menunggu lawan menyelesaikan balapan. " + txt;
+        }
       }
       function check(n) {
         if (ROLE === "solo") {
@@ -1666,42 +1636,49 @@
         }
         const pe = oppPeer(),
           pr = pe && pe.presence.round === ROUND ? pe.presence : null;
+        if (pr && pr.ft != null) oppFinal = { ok: pr.ok || 0, sc: pr.sc || 0, t: pr.ft };
         if (pe) lastSeen = n;
-        else if (n - lastSeen > 4000)
+        else if (!oppFinal && n - lastSeen > 4000)
           return finish("win", "Lawan keluar dari room.");
-        const oft = pr && pr.ft != null ? pr.ft : null;
-        if (me.t !== null) {
-          if (!me.tAt) me.tAt = n;
-          if (oft !== null) finish(me.t <= oft ? "win" : "lose");
-          else if (n - me.tAt > 4000) finish("win");
-        } else if (oft !== null) finish("lose");
+        if (me.t === null) return; // lawan selesai duluan? tetap lanjutkan balapanmu
+        if (!me.tAt) me.tAt = n;
+        if (oppFinal) return finish(judge({ ok: me.ok, sc: me.sc, t: me.t }, oppFinal));
+        if (n - me.tAt > 90000) {
+          const o = pr ? pr.sc || 0 : 0;
+          return finish(me.sc >= o ? "win" : "lose", "Lawan terlalu lama menyelesaikan balapan.");
+        }
+        showFinishWait(pr);
       }
       function finish(res, msg) {
         if (!run) return;
         run = false;
         phase = "done";
         if (ROOM && ROLE !== "solo")
-          ROOM.presence({ d: +me.d.toFixed(1), ft: me.t }).catch(() => {});
+          ROOM.presence({ gi: me.gi, ok: me.ok, sc: me.sc, ft: me.t }).catch(() => {});
         if (ROOM && ROLE !== "solo") ROOM.hot(false);
-        const win = res === "win";
-        if (win) SFX.fin();
+        const win = res === "win",
+          draw = res === "draw",
+          o2 = oppFinal;
+        if (win || draw) SFX.fin();
         else SFX.bad(-1);
         silence();
-        const o = $("ov");
+        const o = $("ov"),
+          icon = win ? "🏆" : draw ? "🤝" : "💥",
+          col = win ? "#3dff7a" : draw ? "#ffd400" : "#ff5577",
+          title = win ? "KAMU MENANG!" : draw ? "SERI!" : "KAMU KALAH",
+          tie = o2 && me.t !== null && me.sc === o2.sc;
         o.style.display = "flex";
         o.innerHTML =
-          `<div class="in"><div style="font-size:42px">${
-            win ? "🏆" : "💥"
-          }</div><h2 style="margin:0;color:${win ? "#3dff7a" : "#ff5577"}">${
-            win ? "KAMU MENANG!" : "KAMU KALAH"
-          }</h2><p>${msg ? msg + "<br>" : ""}Jarakmu: ${Math.round(
-            Math.min(me.d, FIN)
-          )} m · Benar ${me.ok}/${NG} · Skor ${me.sc}${
-            ROLE === "solo"
-              ? ""
-              : `<br>Lawan: ${Math.round(Math.min(op.d, FIN))} m`
+          `<div class="in"><div style="font-size:42px">${icon}</div><h2 style="margin:0;color:${col}">${title}</h2><p>${
+            msg ? msg + "<br>" : ""
+          }Skor: kamu <b>${me.sc}</b>${
+            ROLE === "solo" || !o2 ? "" : ` · lawan <b>${o2.sc}</b>`
+          }<br>Jawaban benar: ${me.ok}/${NG}${
+            ROLE === "solo" || !o2 ? "" : ` · lawan ${o2.ok}/${NG}`
           }${
-            me.t !== null ? `<br>Waktumu: ${me.t.toFixed(1)} detik` : ""
+            me.t !== null ? `<br>Waktumu: ${me.t.toFixed(1)} detik${o2 ? ` · lawan ${o2.t.toFixed(1)} detik` : ""}` : ""
+          }${
+            tie ? "<br>Skor sama, jadi jawaban benar terbanyak lalu waktu tercepat yang menentukan." : ""
           }</p>` +
           (ROLE === "guest"
             ? "<p>Menunggu host memulai ulang…</p>"
@@ -1727,20 +1704,7 @@
         const p = me,
           solo = ROLE === "solo";
         setW("pm", Math.round(Math.min(100, (p.d / FIN) * 100) * 10) / 10 + "%");
-        setW("po", Math.round(Math.min(100, (op.d / FIN) * 100) * 10) / 10 + "%");
         setT("dm", Math.round(Math.min(p.d, FIN)) + " m");
-        setT("do", Math.round(Math.min(op.d, FIN)) + " m");
-        const gp = Math.round(p.d - op.d);
-        setT(
-          "gap",
-          solo ? "" : gp >= 0 ? `Unggul ${gp} m` : `Tertinggal ${-gp} m`
-        );
-        const G = $("gap"),
-          gc = gp >= 0 ? "#3dff7a" : "#ff5577";
-        if (HC.gc !== gc) {
-          HC.gc = gc;
-          G.style.color = gc;
-        }
         setT(
           "s0",
           `${p.sp < -0.3 ? "R " : ""}${Math.round(
@@ -1755,7 +1719,7 @@
       }
       function frame(dt = 0) {
         const p = me;
-        drawScene(p.d, p.lx, p.lane, p.sp, p.br, ROLE === "solo" ? null : op);
+        drawScene(p.d, p.lx, p.lane, p.sp, p.br);
         hud();
         engine();
       }
