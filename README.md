@@ -1,4 +1,4 @@
-# Math Racer 3D Online (Vercel + Upstash Redis)
+# Math Racer Online (Vercel + Upstash Redis)
 
 Balapan soal matematika 1 lawan 1 lewat **kode room 4 karakter**, dengan arsitektur yang sama seperti
 War of Kingdoms: server kecil di Vercel yang menyimpan room di Upstash Redis, klien melakukan polling.
@@ -33,6 +33,13 @@ Jika Redis belum terhubung, room gagal dibuat dengan pesan: *"Database belum dik
 `vercel.json` memasang function di region `sin1` (Singapura) agar latensi rendah. Bila Vercel menolak
 pengaturan `regions` di paketmu, hapus baris itu; game tetap jalan, hanya sedikit lebih lambat.
 
+## Tampilan 2D (ringan)
+
+Game dilihat dari atas dengan Canvas 2D: jalan 3 jalur yang bergulir, gerbang jawaban di tiap jalur,
+mobil (Lamborghini / Porsche / Ferrari) dengan api nitro dan lampu rem. Tidak butuh WebGL maupun
+three.js (±600 KB lebih kecil), jadi jalan mulus di HP lama dan laptop tanpa GPU. Resolusi canvas dibatasi
+1,5x dan teks HUD hanya diperbarui saat nilainya berubah. Di HP layar dibuat tegak (portrait).
+
 ## Cara main
 
 **A/D** pindah jalur (atau tap jalur di HP), **W** gas, **S** rem/mundur. Masuk ke jalur dengan jawaban
@@ -42,7 +49,7 @@ benar untuk NITRO. Yang sampai finish duluan menang. Host menekan **Main lagi** 
 
 ```bash
 node dev-server.js      # http://localhost:3000 (penyimpanan memori, hanya untuk pengembangan)
-npm test                # 22 tes: API room + dua klien lewat transport
+npm test                # 22 tes API room + transport, plus tes render 2D (DOM/canvas tiruan)
 ```
 
 Buka dua jendela (satu biasa, satu samaran) untuk mencoba dua pemain.
@@ -54,4 +61,4 @@ Buka dua jendela (satu biasa, satu samaran) untuk mencoba dua pemain.
 - Tidak ada login: siapa pun yang tahu kode 4 karakter bisa bergabung bila kursi guest kosong.
   Untuk trafik publik besar, tambahkan pembatasan laju (mis. Vercel Firewall).
 - Latensi lawan sekitar 0,3–0,6 detik; posisi lawan diinterpolasi. Hasil (waktu finish) dibandingkan di kedua sisi.
-- Library three.js dimuat dari cdnjs. Mau mandiri penuh? Unduh ke `public/` dan ganti `<script src>`.
+- Tanpa library eksternal: tampilan memakai Canvas 2D bawaan browser, jadi tidak ada unduhan three.js.

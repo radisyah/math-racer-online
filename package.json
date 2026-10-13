@@ -5,7 +5,7 @@
   "description": "Math Racer 3D Online: balapan soal matematika 1 lawan 1 lewat kode room (Vercel + Upstash Redis).",
   "scripts": {
     "dev": "node dev-server.js",
-    "test": "node test/api.test.js"
+    "test": "node test/api.test.js && node test/render.test.js"
   },
   "engines": { "node": ">=20" }
 }
