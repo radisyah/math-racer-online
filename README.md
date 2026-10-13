@@ -40,6 +40,15 @@ mobil (Lamborghini / Porsche / Ferrari) dengan api nitro dan lampu rem. Tidak bu
 three.js (±600 KB lebih kecil), jadi jalan mulus di HP lama dan laptop tanpa GPU. Resolusi canvas dibatasi
 1,5x dan teks HUD hanya diperbarui saat nilainya berubah. Di HP layar dibuat tegak (portrait).
 
+## Fisika balapan
+
+- Kecepatan maksimum 230 km/jam, nitro sampai 345 km/jam. Tenaga mesin menurun mendekati batas, rem kuat, dan melepas gas membuat mobil melambat bertahap.
+- Jawaban benar memberi **nitro 2,4 detik** (dorongan otomatis); jawaban salah memotong kecepatan sampai 36 km/jam.
+- Jarak antar gerbang 700 m (10 gerbang, finish di 7.200 m). Balapan sempurna sekitar 100 detik.
+- Pratinjau jawaban gerbang berikutnya selalu tampil di atas jalan, sehingga cukup waktu menghitung walau mobil ngebut.
+- Mobil lawan terlihat langsung di jalan (beserta penunjuk jarak saat di luar layar).
+- Konstanta ada di bagian atas script `public/index.html`: `GAP`, `VMAX`, `VNIT`.
+
 ## Cara main
 
 **A/D** pindah jalur (atau tap jalur di HP), **W** gas, **S** rem/mundur. Masuk ke jalur dengan jawaban

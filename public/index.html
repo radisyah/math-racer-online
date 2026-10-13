@@ -440,7 +440,9 @@
     </div>
     <script src="net.js"></script>
     <script>
-      const GAP = 400,
+      const GAP = 700,
+        VMAX = 64, // m/s ≈ 230 km/h
+        VNIT = 96, // m/s ≈ 345 km/h saat nitro
         NG = 10,
         FIN = GAP * NG + 200,
         LEN = FIN + 400,
@@ -550,8 +552,8 @@
       let THUMBS = [];
       const cv = $("cv"),
         cx = cv.getContext("2d", { alpha: false });
-      const VIEW_AHEAD = 150, // meter yang terlihat di depan mobil
-        VIEW_BEHIND = 30;
+      const VIEW_AHEAD = 80; // meter yang terlihat di depan mobil (kecil = terasa ngebut)
+      let TOPY = 140; // batas atas area balap (di bawah kotak soal; disesuaikan tinggi kotak soal)
       let W = 600,
         H = 400,
         RX = 0,
@@ -718,6 +720,12 @@
           c.fill();
         });
       }
+      function fitTop(noReflow) {
+        const q = $("q0"),
+          qb = noReflow ? 0 : (q.offsetTop || 0) + (q.offsetHeight || 0);
+        TOPY = Math.max(140, qb + 44);
+        PXU = Math.max(1.6, (CARY - TOPY) / VIEW_AHEAD);
+      }
       function layout() {
         const portrait = innerHeight > innerWidth;
         W = Math.min(innerWidth - 16, 964);
@@ -728,7 +736,7 @@
         RX = (W - RW) / 2;
         LP = RW / 3;
         CARY = H * 0.76;
-        PXU = Math.max(0.9, (CARY - 130) / VIEW_AHEAD);
+        fitTop(true);
       }
       let DPR = 1;
       function sizeCanvas() {
@@ -740,12 +748,14 @@
         $("wrap").style.width = W + "px";
         $("wrap").style.height = H + "px";
       }
-      function drawScene(d, lx, lane, sp, br, hotSpd) {
+      function drawScene(d, lx, lane, sp, br, opp) {
         const c = cx;
         c.setTransform(DPR, 0, 0, DPR, 0, 0);
-        const yOf = (dd) => CARY - (dd - d) * PXU;
-        const top = d - CARY / PXU - 10, // jarak dunia di tepi bawah layar
-          far = d + (CARY + 40) / PXU;
+        // kamera sedikit mundur saat ngebut agar jalan di depan lebih terlihat
+        const cy = CARY + Math.min(38, Math.max(0, sp) * 0.4);
+        const yOf = (dd) => cy - (dd - d) * PXU;
+        const top = d - cy / PXU - 10, // jarak dunia di tepi bawah layar
+          far = d + (cy + 40) / PXU;
         // rumput bergaris
         c.fillStyle = "#2f7d3c";
         c.fillRect(0, 0, W, H);
@@ -868,13 +878,113 @@
           c.strokeText("🏁 FINISH 🏁", W / 2, y - 16);
           c.fillText("🏁 FINISH 🏁", W / 2, y - 16);
         }
-        // garis kecepatan
-        if (sp > 30) {
-          c.fillStyle = `rgba(255,255,255,${Math.min(0.32, (sp - 30) / 70)})`;
-          for (let i = 0; i < 12; i++) {
+        // garis kecepatan + hembusan angin di rumput
+        if (sp > 20) {
+          const al = Math.min(0.42, (sp - 20) / 110);
+          c.fillStyle = `rgba(255,255,255,${al})`;
+          for (let i = 0; i < 18; i++) {
             const x = RX + hash(i + 9) * RW,
-              yy = (((hash(i + 40) * H + d * PXU * 1.6) % (H + 120)) + H + 120) % (H + 120) - 60;
-            c.fillRect(x, yy, 2, 26 + sp * 0.6);
+              yy = ((((hash(i + 40) * H + d * PXU * 1.7) % (H + 160)) + H + 160) % (H + 160)) - 80;
+            c.fillRect(x, yy, 2, 24 + sp * 0.9);
+          }
+          if (RX > 16) {
+            c.fillStyle = `rgba(255,255,255,${al * 0.6})`;
+            for (let i = 0; i < 8; i++) {
+              const x = hash(i + 70) * (RX - 4),
+                yy = ((((hash(i + 90) * H + d * PXU * 2.2) % (H + 160)) + H + 160) % (H + 160)) - 80;
+              c.fillRect(x, yy, 2, 30 + sp);
+              c.fillRect(W - 2 - x, yy + 40, 2, 30 + sp);
+            }
+          }
+        }
+        // pratinjau jawaban gerbang berikutnya (jelas terbaca sebelum gerbang terlihat)
+        if (me && run && me.gi < NG && Q[me.gi]) {
+          const q = Q[me.gi],
+            y0 = TOPY - 34,
+            rem = Math.max(0, Math.round((me.gi + 1) * GAP - d));
+          for (let k = 0; k < 3; k++) {
+            const x = RX + k * LP + 6,
+              w = LP - 12;
+            c.globalAlpha = 0.93;
+            c.fillStyle = BD[k];
+            rr(c, x, y0, w, 28, 8);
+            c.fill();
+            c.globalAlpha = 1;
+            c.lineWidth = 2;
+            c.strokeStyle = "#fff";
+            c.stroke();
+            c.font = "800 19px system-ui,Arial,sans-serif";
+            c.textAlign = "center";
+            c.textBaseline = "middle";
+            c.lineWidth = 4;
+            c.strokeStyle = "rgba(0,0,0,.65)";
+            c.strokeText(String(q.o[k]), x + w / 2, y0 + 15);
+            c.fillStyle = "#fff";
+            c.fillText(String(q.o[k]), x + w / 2, y0 + 15);
+          }
+          c.font = "700 12px system-ui,Arial,sans-serif";
+          c.textBaseline = "top";
+          c.lineWidth = 3;
+          c.strokeStyle = "rgba(0,0,0,.7)";
+          const cap = `GERBANG ${me.gi + 1}/${NG} · ${rem} m`;
+          c.strokeText(cap, W / 2, y0 + 31);
+          c.fillStyle = "#fff";
+          c.fillText(cap, W / 2, y0 + 31);
+        }
+        // mobil lawan (online)
+        if (opp) {
+          const oy = yOf(opp.d),
+            ow = LP * 0.46,
+            ol = ow * 2.1,
+            ox = RX + (opp.lx + 0.5) * LP;
+          if (oy > TOPY - ol && oy < H + ol) {
+            c.save();
+            c.translate(ox, oy);
+            c.rotate((opp.ln - opp.lx) * 0.35);
+            c.fillStyle = "rgba(0,0,0,.25)";
+            rr(c, -ow / 2 + 4, -ol / 2 + 6, ow, ol, 10);
+            c.fill();
+            if (opp.sp > VMAX * 1.03) {
+              c.globalCompositeOperation = "lighter";
+              drawFlame(c, ow, ol);
+              c.globalCompositeOperation = "source-over";
+            }
+            drawCar(c, opp.car || 0, ow, ol, {});
+            c.restore();
+            c.font = "800 11px system-ui,Arial,sans-serif";
+            c.textAlign = "center";
+            c.textBaseline = "bottom";
+            c.fillStyle = COL[1];
+            c.strokeStyle = "rgba(0,0,0,.75)";
+            c.lineWidth = 3;
+            c.strokeText("LAWAN", ox, oy - ol / 2 - 3);
+            c.fillText("LAWAN", ox, oy - ol / 2 - 3);
+          } else {
+            const ahead = oy <= TOPY - ol,
+              gapm = Math.round(Math.abs(opp.d - d)),
+              ay = ahead ? TOPY + 8 : H - 46;
+            c.fillStyle = COL[1];
+            c.beginPath();
+            if (ahead) {
+              c.moveTo(ox, ay);
+              c.lineTo(ox - 11, ay + 16);
+              c.lineTo(ox + 11, ay + 16);
+            } else {
+              c.moveTo(ox, ay + 16);
+              c.lineTo(ox - 11, ay);
+              c.lineTo(ox + 11, ay);
+            }
+            c.closePath();
+            c.fill();
+            c.font = "800 12px system-ui,Arial,sans-serif";
+            c.textAlign = "center";
+            c.textBaseline = ahead ? "top" : "bottom";
+            c.lineWidth = 3;
+            c.strokeStyle = "rgba(0,0,0,.75)";
+            const t = (ahead ? "LAWAN +" : "LAWAN -") + gapm + " m";
+            const ty = ahead ? ay + 18 : ay - 2;
+            c.strokeText(t, ox, ty);
+            c.fillText(t, ox, ty);
           }
         }
         // mobil
@@ -882,14 +992,14 @@
           cl = cw * 2.1,
           px = RX + (lx + 0.5) * LP,
           ang = (lane - lx) * 0.35 * Math.min(1, Math.abs(sp) / 10),
-          sh = sp > 40 ? (Math.random() - 0.5) * 2.4 : 0;
+          sh = sp > VMAX * 1.03 ? (Math.random() - 0.5) * 3 : 0;
         c.save();
-        c.translate(px + sh, CARY);
+        c.translate(px + sh, cy);
         c.rotate(ang);
         c.fillStyle = "rgba(0,0,0,.28)";
         rr(c, -cw / 2 + 4, -cl / 2 + 6, cw, cl, 10);
         c.fill();
-        if (sp > 40) {
+        if (sp > VMAX * 1.03) {
           c.globalCompositeOperation = "lighter";
           drawFlame(c, cw, cl);
           c.globalCompositeOperation = "source-over";
@@ -904,7 +1014,8 @@
           p ? p.lx : 1,
           p ? p.lane : 1,
           p ? p.sp : 0,
-          p ? p.br : false
+          p ? p.br : false,
+          null
         );
       }
       function makeThumbs() {
@@ -1059,7 +1170,7 @@
         if (!AC || !run || !me) return;
         const t = AC.currentTime,
           s = Math.abs(me.sp),
-          nit = s > 40,
+          nit = s > VMAX * 1.03,
           gas = K.w || K.arrowup,
           f = (46 + s * 3.4 + (gas && cd > 0 ? 55 : 0)) * (nit ? 1.12 : 1),
           e = EN[0];
@@ -1106,10 +1217,11 @@
         K = {},
         Q = [],
         me = null,
-        op = { d: 0, sp: 0 },
+        op = { d: 0, sp: 0, lx: 1, ln: 1, car: 1 },
         lastNet = 0,
         lastSeen = 0;
       const mk = () => ({
+        nit: 0,
         d: 0,
         sp: 0,
         lane: 1,
@@ -1370,7 +1482,7 @@
         Q = Array.from({ length: NG }, mkQ);
         RNG = Math.random;
         me = mk();
-        op = { d: 0, sp: 0 };
+        op = { d: 0, sp: 0, lx: 1, ln: 1, car: 1 };
         T = 0;
         cd = 3;
         cdn = 4;
@@ -1401,6 +1513,7 @@
       }
       function showQ() {
         $("q0").textContent = me.gi < NG ? Q[me.gi].t : "Menuju finish! 🏁";
+        fitTop();
       }
       function mv(n) {
         if (run && cd <= 0) {
@@ -1464,21 +1577,29 @@
         const p = me,
           g = K.w || K.arrowup,
           b = K.s || K.arrowdown;
-        p.lx += (p.lane - p.lx) * Math.min(1, dt * 10);
+        p.lx += (p.lane - p.lx) * Math.min(1, dt * 13);
         p.brp = p.br;
         p.br = false;
+        p.nit = Math.max(0, p.nit - dt);
         if (g && !b) {
-          p.sp += (p.sp < 0 ? 30 : 14) * dt;
+          // tenaga mesin menurun mendekati kecepatan maksimum
+          p.sp +=
+            (p.sp < 0 ? 34 : 22) *
+            Math.max(0.05, 1 - Math.max(0, p.sp) / VMAX) *
+            dt;
         } else if (b) {
-          if (!p.brp && p.sp > 18) SFX.skid(-1);
+          if (!p.brp && p.sp > 24) SFX.skid(-1);
           p.br = true;
-          p.sp -= (p.sp > 0 ? 32 : 9) * dt;
+          p.sp -= (p.sp > 0 ? 50 : 10) * dt;
         } else
           p.sp -=
             Math.sign(p.sp) *
-            Math.min(Math.abs(p.sp), (3 + Math.abs(p.sp) * 0.06) * dt);
-        if (p.sp > 38) p.sp -= Math.min(p.sp - 38, 16 * dt);
-        if (p.sp < -9) p.sp = -9;
+            Math.min(Math.abs(p.sp), (3 + Math.abs(p.sp) * 0.11) * dt);
+        if (p.nit > 0 && !b)
+          p.sp += 60 * Math.max(0, 1 - p.sp / VNIT) * dt; // dorongan nitro
+        const top = p.nit > 0 ? VNIT : VMAX;
+        if (p.sp > top) p.sp -= Math.min(p.sp - top, 22 * dt);
+        if (p.sp < -12) p.sp = -12;
         const o = p.d;
         p.d = Math.max(0, p.d + p.sp * dt);
         if (p.d === 0 && p.sp < 0) p.sp = 0;
@@ -1487,7 +1608,8 @@
         if (p.gi < NG && p.d >= (p.gi + 1) * GAP) {
           const q = Q[p.gi];
           if (p.lane === q.cl) {
-            p.sp = 52;
+            p.nit = 2.4;
+            p.sp = Math.min(VNIT, p.sp + 16);
             p.st++;
             p.ok++;
             p.sc += 100 + p.st * 20;
@@ -1497,7 +1619,8 @@
             SFX.nitro(-1);
           } else {
             SFX.bad(-1);
-            p.sp = 4;
+            p.nit = 0;
+            p.sp = Math.min(p.sp, 10);
             p.st = 0;
             p.msg = "Salah! = " + q.o[q.cl];
             p.mc = "#ff5577";
@@ -1513,6 +1636,9 @@
           pr = pe && pe.presence;
         if (pr && pr.round === ROUND) {
           op.sp = pr.sp || 0;
+          if (pr.car != null) op.car = pr.car;
+          op.ln = pr.ln != null ? pr.ln : 1;
+          op.lx += (op.ln - op.lx) * Math.min(1, dt * 9);
           const age = Math.min(0.8, Math.max(0, (performance.now() - (pe.at || 0)) / 1000));
           op.d +=
             ((pr.d || 0) + op.sp * (age + 0.12) - op.d) * Math.min(1, dt * 8);
@@ -1526,6 +1652,7 @@
           round: ROUND,
           d: +me.d.toFixed(1),
           sp: +me.sp.toFixed(1),
+          ln: me.lane,
           gi: me.gi,
           ok: me.ok,
           sc: me.sc,
@@ -1628,13 +1755,14 @@
       }
       function frame(dt = 0) {
         const p = me;
-        drawScene(p.d, p.lx, p.lane, p.sp, p.br);
+        drawScene(p.d, p.lx, p.lane, p.sp, p.br, ROLE === "solo" ? null : op);
         hud();
         engine();
       }
       function resize() {
         layout();
         sizeCanvas();
+        fitTop();
         render();
       }
       addEventListener("resize", resize);
