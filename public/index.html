@@ -1,0 +1,2072 @@
+<!DOCTYPE html>
+<html lang="id">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover"
+    />
+    <title>Math Racer 3D Online</title>
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 100 100%27%3E%3Ctext y=%27.9em%27 font-size=%2790%27%3E%F0%9F%8F%8E%EF%B8%8F%3C/text%3E%3C/svg%3E"
+    />
+    <style>
+      :root {
+        box-sizing: border-box;
+        padding-top: env(safe-area-inset-top, 0px);
+        padding-bottom: env(safe-area-inset-bottom, 0px);
+        --bg: #0b0f1a;
+        --fg: #e8f0ff;
+        --c1: #00e5ff;
+        --c2: #ffa500;
+      }
+      html {
+        scroll-padding-top: env(safe-area-inset-top, 0px);
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--fg);
+        font-family: system-ui, Segoe UI, Arial, sans-serif;
+        display: flex;
+        justify-content: center;
+      }
+      #app {
+        width: 100%;
+        max-width: 980px;
+        padding: 8px;
+      }
+      h1 {
+        font-size: 17px;
+        margin: 2px 0 6px;
+        letter-spacing: 2px;
+        text-align: center;
+      }
+      #wrap {
+        position: relative;
+        border-radius: 10px;
+        overflow: hidden;
+        background: #000;
+        margin: 0 auto;
+      }
+      canvas {
+        display: block;
+      }
+      #hud {
+        position: absolute;
+        inset: 0;
+        display: grid;
+        grid-template-columns: 1fr;
+        pointer-events: none;
+      }
+      .hp {
+        position: relative;
+        border-left: 1px solid #000;
+      }
+      .q {
+        position: absolute;
+        top: 64px;
+        left: 6px;
+        right: 6px;
+        background: #0b0f1acc;
+        border: 2px solid;
+        border-radius: 8px;
+        padding: 4px;
+        text-align: center;
+        font-size: clamp(11px, 2vw, 16px);
+        font-weight: 700;
+      }
+      .bar {
+        position: absolute;
+        left: 6px;
+        right: 6px;
+        height: 5px;
+        background: #0008;
+        border-radius: 3px;
+      }
+      .bar i {
+        display: block;
+        height: 100%;
+        border-radius: 3px;
+      }
+      .st {
+        position: absolute;
+        left: 8px;
+        right: 8px;
+        bottom: 6px;
+        display: flex;
+        justify-content: space-between;
+        font-size: clamp(11px, 2vw, 15px);
+        font-weight: 700;
+        text-shadow: 0 1px 3px #000;
+      }
+      .ms {
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: 42%;
+        text-align: center;
+        font-size: clamp(18px, 4vw, 30px);
+        font-weight: 800;
+        text-shadow: 0 2px 6px #000;
+      }
+      #ov {
+        position: absolute;
+        inset: 0;
+        background: rgba(5, 8, 16, 0.93);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 12px;
+        text-align: center;
+        z-index: 5;
+        overflow: auto;
+      }
+      #ov p {
+        margin: 0;
+        font-size: 13px;
+        opacity: 0.88;
+        max-width: 440px;
+      }
+      button {
+        background: #00e5ff;
+        color: #001018;
+        border: 0;
+        border-radius: 10px;
+        padding: 11px 16px;
+        font-size: 15px;
+        font-weight: 700;
+        width: 100%;
+        max-width: 260px;
+        cursor: pointer;
+      }
+      .hint {
+        font-size: 11px;
+        opacity: 0.6;
+        text-align: center;
+        margin-top: 6px;
+      }
+      #ov .in {
+        margin: auto;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+        width: 100%;
+      }
+      #ov h3 {
+        margin: 2px 0 0;
+        font-size: 14px;
+        letter-spacing: 1px;
+      }
+      #ov details {
+        max-width: 480px;
+        font-size: 12px;
+        opacity: 0.88;
+      }
+      #ov summary {
+        cursor: pointer;
+        opacity: 0.8;
+      }
+      .row {
+        display: grid;
+        grid-template-columns: 30px repeat(3, 1fr);
+        gap: 6px;
+        width: 100%;
+        max-width: 620px;
+        align-items: stretch;
+      }
+      .row > b {
+        align-self: center;
+        font-size: 14px;
+      }
+      .card {
+        background: #101a2e;
+        border: 2px solid #2a3550;
+        border-radius: 10px;
+        padding: 4px;
+        cursor: pointer;
+        display: flex;
+        flex-direction: column;
+        gap: 1px;
+        font-size: 12px;
+        font-weight: 700;
+        user-select: none;
+        -webkit-user-select: none;
+        transition: border-color 0.15s, box-shadow 0.15s;
+      }
+      .card img {
+        width: 100%;
+        display: block;
+        border-radius: 6px;
+        pointer-events: none;
+      }
+      .card small {
+        font-size: 9.5px;
+        font-weight: 400;
+        opacity: 0.7;
+        line-height: 1.25;
+      }
+      .card.on {
+        border-color: var(--c);
+        box-shadow: 0 0 12px var(--c);
+      }
+      .lv {
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+        justify-content: center;
+        width: 100%;
+        max-width: 620px;
+        margin-top: 2px;
+      }
+      .lv button {
+        flex: 1 1 150px;
+        max-width: none;
+        width: auto;
+      }
+      #app {
+        position: relative;
+      }
+      #snd {
+        position: absolute;
+        top: 2px;
+        right: 8px;
+        width: 32px;
+        height: 32px;
+        padding: 0;
+        border-radius: 50%;
+        font-size: 15px;
+        background: #0b0f1acc;
+        color: #fff;
+        border: 1px solid #fff4;
+        z-index: 6;
+      }
+      #cd {
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: 30%;
+        text-align: center;
+        font-size: clamp(64px, 16vw, 150px);
+        font-weight: 900;
+        line-height: 1;
+        pointer-events: none;
+        z-index: 4;
+        text-shadow: 0 4px 18px #000, 0 0 30px currentColor;
+        animation: none;
+      }
+      #cd.pop {
+        animation: pop 0.9s ease-out;
+      }
+      @keyframes pop {
+        0% {
+          transform: scale(1.7);
+          opacity: 0;
+        }
+        25% {
+          opacity: 1;
+        }
+        100% {
+          transform: scale(1);
+          opacity: 0.95;
+        }
+      }
+      #prog {
+        position: absolute;
+        left: 8px;
+        right: 8px;
+        top: 6px;
+        z-index: 3;
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+        pointer-events: none;
+        font-size: clamp(10px, 1.8vw, 13px);
+        font-weight: 700;
+        text-shadow: 0 1px 3px #000;
+      }
+      .pr {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .pr span {
+        width: 50px;
+      }
+      .pr b {
+        width: 64px;
+        text-align: right;
+      }
+      .pb {
+        flex: 1;
+        height: 9px;
+        background: #0008;
+        border-radius: 5px;
+        overflow: hidden;
+        border: 1px solid #fff3;
+      }
+      .pb i {
+        display: block;
+        height: 100%;
+        width: 0;
+        border-radius: 5px;
+      }
+      #gap {
+        text-align: center;
+        font-size: 12px;
+      }
+      .hp + .hp,
+      .bar {
+        display: none;
+      }
+      .row3 {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 6px;
+        width: 100%;
+        max-width: 620px;
+      }
+      .lvs {
+        display: flex;
+        gap: 6px;
+        width: 100%;
+        max-width: 620px;
+      }
+      .lvb {
+        background: #1a2540;
+        color: #e8f0ff;
+        border: 2px solid #2a3550;
+        padding: 8px 4px;
+        font-size: 12px;
+        width: auto;
+        max-width: none;
+        flex: 1;
+      }
+      .lvb.on {
+        border-color: var(--c1);
+        background: #12304a;
+      }
+      .alt {
+        background: #2a3550;
+        color: #e8f0ff;
+      }
+      .jn {
+        display: flex;
+        gap: 6px;
+        flex: 1 1 220px;
+      }
+      .jn button {
+        flex: 1;
+      }
+      #code {
+        width: 92px;
+        text-transform: uppercase;
+        font-size: 18px;
+        text-align: center;
+        letter-spacing: 4px;
+        border-radius: 10px;
+        border: 2px solid #2a3550;
+        background: #101a2e;
+        color: #fff;
+        padding: 6px;
+      }
+      #ov .note {
+        font-size: 10px;
+        opacity: 0.5;
+        margin: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app">
+      <h1>MATH RACER 3D · ONLINE PVP</h1>
+      <button id="snd" onclick="toggleSnd()" title="Suara">🔊</button>
+      <div id="wrap">
+        <canvas id="cv"></canvas>
+        <div id="prog">
+          <div class="pr">
+            <span style="color: var(--c1)">KAMU</span>
+            <div class="pb"><i id="pm" style="background: var(--c1)"></i></div>
+            <b id="dm">0 m</b>
+          </div>
+          <div class="pr" id="rowo">
+            <span style="color: var(--c2)">LAWAN</span>
+            <div class="pb"><i id="po" style="background: var(--c2)"></i></div>
+            <b id="do">0 m</b>
+          </div>
+          <div id="gap"></div>
+        </div>
+        <div id="hud">
+          <div class="hp">
+            <div class="bar" style="top: 6px">
+              <i id="b0" style="background: var(--c1)"></i>
+            </div>
+            <div class="bar" style="top: 12px; height: 3px">
+              <i id="o0" style="background: var(--c2)"></i>
+            </div>
+            <div class="q" id="q0" style="border-color: var(--c1)">-</div>
+            <div class="ms" id="m0"></div>
+            <div class="st">
+              <span id="s0"></span
+              ><span id="p0" style="color: var(--c1)">P1 · WASD</span>
+            </div>
+          </div>
+          <div class="hp">
+            <div class="bar" style="top: 6px">
+              <i id="b1" style="background: var(--c2)"></i>
+            </div>
+            <div class="bar" style="top: 12px; height: 3px">
+              <i id="o1" style="background: var(--c1)"></i>
+            </div>
+            <div class="q" id="q1" style="border-color: var(--c2)">-</div>
+            <div class="ms" id="m1"></div>
+            <div class="st">
+              <span id="s1"></span
+              ><span id="p1" style="color: var(--c2)">P2 · ←→↑↓</span>
+            </div>
+          </div>
+        </div>
+        <div id="cd"></div>
+        <div id="ov"></div>
+      </div>
+      <div class="hint">
+        Soal yang sama untuk kedua pemain · adu cepat dan teliti!
+      </div>
+    </div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="net.js"></script>
+    <script>
+      const GAP = 400,
+        NG = 10,
+        FIN = GAP * NG + 200,
+        LEN = FIN + 400,
+        LW = 8,
+        COL = ["#00e5ff", "#ffa500"],
+        BC = [0x00c8ff, 0xff8c00],
+        BD = ["#00b4ff", "#ffd400", "#ff4fa3"];
+      const $ = (id) => document.getElementById(id);
+      let RNG = Math.random;
+      const r = (a, b) => a + Math.floor(RNG() * (b - a + 1)),
+        pick = (a) => a[r(0, a.length - 1)];
+      const gens = [
+        () =>
+          pick([
+            () => {
+              let a = r(3, 12),
+                b = r(3, 12);
+              return [`${a} × ${b} = ?`, a * b];
+            },
+            () => {
+              let p = pick([10, 20, 25, 50]),
+                n = r(1, 10) * 20;
+              return [`${p}% dari ${n} = ?`, (n * p) / 100];
+            },
+            () => {
+              let a = r(2, 15),
+                b = r(a + 1, 25);
+              return [`−${b} + ${a} = ?`, a - b];
+            },
+            () => {
+              let a = r(2, 9),
+                b = r(2, 9);
+              return [`${a} × (−${b}) = ?`, -a * b];
+            },
+          ])(),
+        () =>
+          pick([
+            () => {
+              let v = r(2, 12),
+                a = r(2, 6),
+                b = r(1, 15);
+              return [`${a}x + ${b} = ${a * v + b} → x = ?`, v];
+            },
+            () => {
+              let t = pick([
+                [3, 4, 5],
+                [5, 12, 13],
+                [8, 15, 17],
+                [6, 8, 10],
+              ]);
+              return [`Sisi tegak ${t[0]} & ${t[1]}, sisi miring = ?`, t[2]];
+            },
+            () => {
+              let n = r(3, 7);
+              return [`2^${n} = ?`, 2 ** n];
+            },
+            () => {
+              let n = r(4, 15);
+              return [`√${n * n} = ?`, n];
+            },
+          ])(),
+        () =>
+          pick([
+            () => {
+              let n = r(3, 6);
+              return [`²log ${2 ** n} = ?`, n];
+            },
+            () => {
+              let a = r(2, 5),
+                b = r(2, 6);
+              return [`f(x)=${a}x², f'(${b}) = ?`, 2 * a * b];
+            },
+            () => {
+              let n = r(5, 12);
+              return [`Suku ke-${n} barisan 3, 7, 11, … = ?`, 3 + 4 * (n - 1)];
+            },
+            () => {
+              let k = r(2, 9) * 2;
+              return [`sin 30° × ${k * 2} = ?`, k];
+            },
+            () => {
+              let a = r(2, 9),
+                d = r(2, 5);
+              return [`Rata-rata ${a}, ${a + d}, ${a + 2 * d} = ?`, a + d];
+            },
+          ])(),
+      ];
+      // ---- 3D setup
+      const cv = $("cv"),
+        R = new THREE.WebGLRenderer({ canvas: cv, antialias: true });
+      R.setPixelRatio(Math.min(devicePixelRatio, 2));
+      R.setScissorTest(true);
+      R.shadowMap.enabled = true;
+      R.shadowMap.type = THREE.PCFSoftShadowMap;
+      R.outputEncoding = THREE.sRGBEncoding;
+      R.toneMapping = THREE.ACESFilmicToneMapping;
+      R.toneMappingExposure = 1.05;
+      const sc = new THREE.Scene(),
+        SKY = 0xcfe4f5;
+      sc.fog = new THREE.Fog(SKY, 90, 540);
+      const enc = (T) => {
+        T.encoding = THREE.sRGBEncoding;
+        T.anisotropy = 8;
+        return T;
+      };
+      const hemi = new THREE.HemisphereLight(0xcfe4ff, 0x4a5a3a, 0.55);
+      sc.add(hemi);
+      const sun = new THREE.DirectionalLight(0xfff1d6, 1.9);
+      sun.castShadow = true;
+      sun.shadow.mapSize.set(2048, 2048);
+      const sh = sun.shadow.camera;
+      sh.left = -45;
+      sh.right = 45;
+      sh.top = 45;
+      sh.bottom = -45;
+      sh.near = 1;
+      sh.far = 220;
+      sun.shadow.bias = -0.0004;
+      sun.shadow.normalBias = 0.05;
+      sc.add(sun, sun.target);
+      const cams = [0, 1].map(
+        () => new THREE.PerspectiveCamera(60, 1, 0.5, 700)
+      );
+      // sky dome + environment reflections
+      const skyC = document.createElement("canvas");
+      skyC.width = 4;
+      skyC.height = 256;
+      {
+        const g = skyC.getContext("2d"),
+          gr = g.createLinearGradient(0, 0, 0, 256);
+        gr.addColorStop(0, "#3f7fd0");
+        gr.addColorStop(0.45, "#9cc6ee");
+        gr.addColorStop(0.5, "#dcebf7");
+        gr.addColorStop(0.52, "#6f8a62");
+        gr.addColorStop(1, "#4a5d3e");
+        g.fillStyle = gr;
+        g.fillRect(0, 0, 4, 256);
+      }
+      const skyM = new THREE.MeshBasicMaterial({
+        map: enc(new THREE.CanvasTexture(skyC)),
+        side: THREE.BackSide,
+        fog: false,
+        depthWrite: false,
+      });
+      const sky = new THREE.Mesh(new THREE.SphereGeometry(600, 24, 16), skyM);
+      sky.renderOrder = -1;
+      sc.add(sky);
+      {
+        const es = new THREE.Scene();
+        es.add(
+          new THREE.Mesh(new THREE.SphereGeometry(100, 24, 16), skyM.clone())
+        );
+        const sn = new THREE.Mesh(
+          new THREE.SphereGeometry(12, 12, 8),
+          new THREE.MeshBasicMaterial({ color: 0xfff3d0 })
+        );
+        sn.position.set(-60, 70, 40);
+        es.add(sn);
+        const pm = new THREE.PMREMGenerator(R);
+        sc.environment = pm.fromScene(es).texture;
+      }
+      function tex(t, w, h, bg, fg, fs, bd) {
+        const c = document.createElement("canvas");
+        c.width = w;
+        c.height = h;
+        const g = c.getContext("2d");
+        g.fillStyle = bg;
+        g.fillRect(0, 0, w, h);
+        g.strokeStyle = bd;
+        g.lineWidth = 12;
+        g.strokeRect(6, 6, w - 12, h - 12);
+        g.fillStyle = fg;
+        g.textAlign = "center";
+        g.textBaseline = "middle";
+        let s = fs;
+        g.font = `bold ${s}px system-ui,sans-serif`;
+        while (g.measureText(t).width > w - 50 && s > 20) {
+          s -= 4;
+          g.font = `bold ${s}px system-ui,sans-serif`;
+        }
+        g.fillText(t, w / 2, h / 2 + 4);
+        return enc(new THREE.CanvasTexture(c));
+      }
+      function board(w, h, t, tw, th, fs, bd) {
+        const dk = new THREE.MeshStandardMaterial({
+            color: 0x222831,
+            roughness: 0.6,
+            metalness: 0.4,
+          }),
+          m = new THREE.MeshBasicMaterial({
+            map: tex(t, tw, th, "#0d2b4a", "#fff", fs, bd),
+          });
+        const o = new THREE.Mesh(new THREE.BoxGeometry(w, h, 0.5), [
+          dk,
+          dk,
+          dk,
+          dk,
+          m,
+          dk,
+        ]);
+        o.castShadow = true;
+        return o;
+      }
+      // road & scenery
+      {
+        const c = document.createElement("canvas");
+        c.width = 192;
+        c.height = 128;
+        const g = c.getContext("2d");
+        g.fillStyle = "#3a3d44";
+        g.fillRect(0, 0, 192, 128);
+        for (let i = 0; i < 5000; i++) {
+          g.fillStyle = `rgba(${r(0, 1) ? 255 : 0},${r(0, 1) ? 255 : 0},${
+            r(0, 1) ? 255 : 0
+          },.07)`;
+          g.fillRect(r(0, 191), r(0, 127), 1, 1);
+        }
+        g.fillStyle = "#f2f2f2";
+        g.fillRect(4, 0, 4, 128);
+        g.fillRect(184, 0, 4, 128);
+        for (const x of [63, 127]) g.fillRect(x, 0, 3, 48);
+        const T = enc(new THREE.CanvasTexture(c));
+        T.wrapT = THREE.RepeatWrapping;
+        T.repeat.set(1, LEN / 16);
+        const road = new THREE.Mesh(
+          new THREE.PlaneGeometry(24, LEN),
+          new THREE.MeshStandardMaterial({
+            map: T,
+            roughness: 0.85,
+            envMapIntensity: 0.3,
+          })
+        );
+        road.rotation.x = -Math.PI / 2;
+        road.position.z = -LEN / 2 + 60;
+        road.receiveShadow = true;
+        sc.add(road);
+        const gc = document.createElement("canvas");
+        gc.width = gc.height = 128;
+        const gg = gc.getContext("2d");
+        gg.fillStyle = "#4a8a3e";
+        gg.fillRect(0, 0, 128, 128);
+        for (let i = 0; i < 3000; i++) {
+          gg.fillStyle = `rgba(${r(20, 90)},${r(110, 180)},${r(30, 70)},.35)`;
+          gg.fillRect(r(0, 127), r(0, 127), 2, 2);
+        }
+        const GT = enc(new THREE.CanvasTexture(gc));
+        GT.wrapS = GT.wrapT = THREE.RepeatWrapping;
+        GT.repeat.set(60, LEN / 15);
+        const gr = new THREE.Mesh(
+          new THREE.PlaneGeometry(900, LEN),
+          new THREE.MeshStandardMaterial({
+            map: GT,
+            roughness: 1,
+            envMapIntensity: 0.2,
+          })
+        );
+        gr.rotation.x = -Math.PI / 2;
+        gr.position.set(0, -0.05, -LEN / 2 + 60);
+        gr.receiveShadow = true;
+        sc.add(gr);
+        for (const s of [-1, 1]) {
+          const rl = new THREE.Mesh(
+            new THREE.BoxGeometry(0.4, 0.9, LEN),
+            new THREE.MeshStandardMaterial({
+              color: 0xc4c8d0,
+              metalness: 0.7,
+              roughness: 0.35,
+            })
+          );
+          rl.position.set(s * 12.8, 0.45, -LEN / 2 + 60);
+          rl.castShadow = rl.receiveShadow = true;
+          sc.add(rl);
+        }
+        const n = Math.floor(LEN / 22) * 2,
+          tr = new THREE.InstancedMesh(
+            new THREE.CylinderGeometry(0.35, 0.5, 4, 8),
+            new THREE.MeshStandardMaterial({ color: 0x5a3b22, roughness: 1 }),
+            n
+          ),
+          cr = new THREE.InstancedMesh(
+            new THREE.IcosahedronGeometry(3, 1),
+            new THREE.MeshStandardMaterial({
+              color: 0x2a6e32,
+              roughness: 0.9,
+              flatShading: true,
+            }),
+            n
+          ),
+          d = new THREE.Object3D();
+        for (let i = 0; i < n; i++) {
+          const x = (i % 2 ? 1 : -1) * (18 + Math.random() * 40),
+            z = 60 - (i >> 1) * 22 - Math.random() * 10,
+            s = 0.8 + Math.random() * 0.8;
+          d.position.set(x, 2 * s, z);
+          d.scale.set(s, s, s);
+          d.updateMatrix();
+          tr.setMatrixAt(i, d.matrix);
+          d.position.y = 6.5 * s;
+          d.scale.set(s, s * 1.5, s);
+          d.updateMatrix();
+          cr.setMatrixAt(i, d.matrix);
+        }
+        tr.castShadow = cr.castShadow = true;
+        sc.add(tr, cr);
+        const fc = document.createElement("canvas");
+        fc.width = 96;
+        fc.height = 16;
+        const fg = fc.getContext("2d");
+        for (let i = 0; i < 12; i++)
+          for (let j = 0; j < 2; j++) {
+            fg.fillStyle = (i + j) % 2 ? "#fff" : "#111";
+            fg.fillRect(i * 8, j * 8, 8, 8);
+          }
+        const ft = enc(new THREE.CanvasTexture(fc));
+        ft.magFilter = THREE.NearestFilter;
+        const fl = new THREE.Mesh(
+          new THREE.PlaneGeometry(24, 4),
+          new THREE.MeshBasicMaterial({ map: ft })
+        );
+        fl.rotation.x = -Math.PI / 2;
+        fl.position.set(0, 0.05, -FIN);
+        sc.add(fl);
+      }
+      // realistic car
+      function ext(sh, depth, bev, seg = 6) {
+        const g = new THREE.ExtrudeGeometry(sh, {
+          depth,
+          bevelEnabled: true,
+          bevelThickness: bev,
+          bevelSize: bev,
+          bevelSegments: seg,
+          curveSegments: 28,
+        });
+        g.rotateY(Math.PI / 2);
+        g.translate(-depth / 2, 0, 2.4);
+        g.computeVertexNormals();
+        return g;
+      }
+      // ---- car designs (cosmetic only, inspired by Lamborghini / Porsche / Ferrari)
+      const zx = (x) => 2.4 - x;
+      const DESIGNS = [
+        {
+          name: "Lamborghini",
+          sub: "Wedge super rendah · lampu Y · sayap belakang",
+          col: 0xf2c200,
+        },
+        {
+          name: "Porsche",
+          sub: "Fastback klasik · lampu bulat · ekor bebek",
+          col: 0xb4bcc8,
+        },
+        {
+          name: "Ferrari",
+          sub: "Lekuk mulus · lampu belakang bulat ganda",
+          col: 0xd10a0a,
+        },
+      ];
+      const WHS = [
+        {
+          p: [
+            [-1.07, 1.5],
+            [1.07, 1.5],
+            [-1.07, -1.55],
+            [1.07, -1.55],
+          ],
+          n: 3,
+          sd: 0.1,
+          sw: 0.05,
+          rim: 0x30333a,
+          sp: 0xf2c200,
+        },
+        {
+          p: [
+            [-1.05, 1.45],
+            [1.05, 1.45],
+            [-1.05, -1.45],
+            [1.05, -1.45],
+          ],
+          n: 5,
+          sd: 0.07,
+          sw: 0.04,
+          rim: 0xd8dbe0,
+          sp: 0x0c0d10,
+        },
+        {
+          p: [
+            [-1.06, 1.45],
+            [1.06, 1.45],
+            [-1.06, -1.5],
+            [1.06, -1.5],
+          ],
+          n: 7,
+          sd: 0.045,
+          sw: 0.03,
+          rim: 0xd8dbe0,
+          sp: 0x0c0d10,
+        },
+      ];
+      const PL = [
+        [0.52, 2.375],
+        [0.62, 2.435],
+        [0.55, 2.435],
+      ];
+      // glass cabin from bezier segments + painted roof skin
+      function cabin(add, seg, w, gl, bm, x0, x1) {
+        const pts = [];
+        seg.forEach((s) =>
+          pts.push(
+            ...new THREE.CubicBezierCurve(
+              ...s.map((p) => new THREE.Vector2(p[0], p[1]))
+            ).getPoints(20)
+          )
+        );
+        const c = new THREE.Shape();
+        c.moveTo(pts[0].x, pts[0].y);
+        pts.forEach((p) => c.lineTo(p.x, p.y));
+        add(ext(c, w, 0.03), gl, 0, 0, 0);
+        const sub = pts.filter((p) => p.x <= x1 && p.x >= x0),
+          rs = new THREE.Shape();
+        rs.moveTo(sub[0].x, sub[0].y + 0.012);
+        sub.forEach((p) => rs.lineTo(p.x, p.y + 0.012));
+        const L = sub[sub.length - 1];
+        rs.lineTo(L.x, L.y - 0.1);
+        rs.lineTo(sub[0].x, sub[0].y - 0.1);
+        add(ext(rs, w - 0.1, 0.03), bm, 0, 0, 0);
+      }
+      function mkCar(k, pi) {
+        const D = DESIGNS[k],
+          g = new THREE.Group(),
+          bm = new THREE.MeshPhysicalMaterial({
+            color: D.col,
+            metalness: 0.7,
+            roughness: 0.22,
+            clearcoat: 1,
+            clearcoatRoughness: 0.04,
+            envMapIntensity: 1.3,
+          }),
+          gl = new THREE.MeshPhysicalMaterial({
+            color: 0x0a0f18,
+            metalness: 0.9,
+            roughness: 0.04,
+            clearcoat: 1,
+            envMapIntensity: 1.8,
+          }),
+          dk = new THREE.MeshStandardMaterial({
+            color: 0x0c0d10,
+            roughness: 0.6,
+            metalness: 0.3,
+          }),
+          hl = new THREE.MeshStandardMaterial({
+            color: 0xffffee,
+            emissive: 0xffffcc,
+            emissiveIntensity: 2.2,
+          }),
+          tl = new THREE.MeshBasicMaterial({ color: 0x801018 });
+        g.tl = tl;
+        const add = (geo, m, x, y, z) => {
+            const o = new THREE.Mesh(geo, m);
+            o.position.set(x, y, z);
+            g.add(o);
+            return o;
+          },
+          BX = (w, h, d) => new THREE.BoxGeometry(w, h, d);
+        if (k === 0) {
+          // Lamborghini-inspired: low angular wedge
+          const s = new THREE.Shape();
+          s.moveTo(0.1, 0.45);
+          s.lineTo(0.1, 0.9);
+          s.lineTo(1.1, 0.99);
+          s.lineTo(2.3, 1.03);
+          s.lineTo(4.0, 0.74);
+          s.lineTo(4.8, 0.6);
+          s.lineTo(4.8, 0.45);
+          s.lineTo(0.1, 0.45);
+          add(ext(s, 1.96, 0.05, 1), bm, 0, 0, 0);
+          const c = new THREE.Shape();
+          c.moveTo(1.2, 0.99);
+          c.lineTo(1.85, 1.36);
+          c.lineTo(2.55, 1.4);
+          c.lineTo(3.7, 0.8);
+          c.lineTo(1.2, 0.99);
+          add(ext(c, 1.56, 0.04, 1), gl, 0, 0, 0);
+          add(BX(1.2, 0.06, 0.7), bm, 0, 1.425, zx(2.2));
+          [
+            [0.5, 1.0],
+            [0.75, 1.03],
+            [1.0, 1.05],
+          ].forEach(([x, y]) => add(BX(1.3, 0.03, 0.14), dk, 0, y, zx(x)));
+          for (const x of [-1, 1]) {
+            add(BX(0.08, 0.28, 0.9), dk, x * 1.02, 0.74, zx(2.7));
+            add(BX(0.06, 0.3, 0.16), bm, x * 0.75, 1.03, 2.15);
+            const a = add(BX(0.6, 0.06, 0.1), hl, x * 0.68, 0.7, -2.15);
+            a.rotation.y = x * 0.35;
+            const b = add(BX(0.32, 0.06, 0.1), hl, x * 0.4, 0.74, -1.95);
+            b.rotation.y = -x * 0.5;
+            const t = add(BX(0.5, 0.07, 0.05), tl, x * 0.55, 0.72, 2.37);
+            t.rotation.z = x * 0.5;
+          }
+          add(BX(2.0, 0.05, 0.55), bm, 0, 1.18, 2.15);
+          add(BX(2.0, 0.05, 0.55), dk, 0, 0.41, -2.25);
+          add(BX(1.3, 0.13, 0.06), dk, 0, 0.53, -2.46);
+          add(BX(1.5, 0.07, 0.05), tl, 0, 0.82, 2.37);
+        } else if (k === 1) {
+          // Porsche-inspired: rounded fastback
+          const s = new THREE.Shape();
+          s.moveTo(0.1, 0.45);
+          s.lineTo(0.1, 0.9);
+          s.bezierCurveTo(0.1, 1.03, 0.5, 1.08, 1.0, 1.1);
+          s.lineTo(1.6, 1.1);
+          s.bezierCurveTo(2.4, 1.12, 3.2, 1.04, 4.0, 0.92);
+          s.bezierCurveTo(4.4, 0.86, 4.7, 0.78, 4.72, 0.62);
+          s.bezierCurveTo(4.74, 0.55, 4.72, 0.5, 4.64, 0.45);
+          s.lineTo(0.1, 0.45);
+          add(ext(s, 1.9, 0.12), bm, 0, 0, 0);
+          cabin(
+            add,
+            [
+              [
+                [3.15, 1.0],
+                [2.95, 1.2],
+                [2.7, 1.5],
+                [2.3, 1.52],
+              ],
+              [
+                [2.3, 1.52],
+                [1.7, 1.55],
+                [1.1, 1.3],
+                [0.75, 0.98],
+              ],
+            ],
+            1.56,
+            gl,
+            bm,
+            0.9,
+            2.78
+          );
+          const d = add(BX(1.7, 0.05, 0.45), bm, 0, 1.12, 2.2);
+          d.rotation.x = -0.12;
+          for (const x of [-1, 1]) {
+            const h = add(
+              new THREE.SphereGeometry(0.2, 16, 12),
+              hl,
+              x * 0.72,
+              0.93,
+              -2.0
+            );
+            h.scale.set(1, 1, 0.8);
+          }
+          add(BX(1.8, 0.07, 0.05), tl, 0, 0.9, 2.45);
+          add(BX(1.2, 0.12, 0.06), dk, 0, 0.52, -2.47);
+          add(BX(1.2, 0.1, 0.04), dk, 0, 0.75, 2.44);
+        } else {
+          // Ferrari-inspired: smooth curvy mid-engine
+          const s = new THREE.Shape();
+          s.moveTo(0.1, 0.45);
+          s.lineTo(0.1, 0.95);
+          s.bezierCurveTo(0.1, 1.07, 0.5, 1.12, 1.2, 1.12);
+          s.bezierCurveTo(2.2, 1.12, 3.2, 1.1, 3.9, 0.95);
+          s.bezierCurveTo(4.3, 0.87, 4.62, 0.8, 4.7, 0.68);
+          s.bezierCurveTo(4.76, 0.6, 4.74, 0.5, 4.66, 0.45);
+          s.lineTo(0.1, 0.45);
+          add(ext(s, 1.92, 0.12), bm, 0, 0, 0);
+          cabin(
+            add,
+            [
+              [
+                [3.3, 1.05],
+                [3.0, 1.22],
+                [2.8, 1.46],
+                [2.4, 1.47],
+              ],
+              [
+                [2.4, 1.47],
+                [1.95, 1.48],
+                [1.6, 1.3],
+                [1.2, 1.08],
+              ],
+            ],
+            1.55,
+            gl,
+            bm,
+            1.35,
+            2.7
+          );
+          const d = add(BX(1.7, 0.05, 0.35), bm, 0, 1.17, 2.2);
+          d.rotation.x = -0.08;
+          const rg = new THREE.CylinderGeometry(0.17, 0.17, 0.05, 20),
+            dg = new THREE.CylinderGeometry(0.21, 0.21, 0.04, 20);
+          for (const x of [-1, 1]) {
+            add(BX(0.08, 0.3, 0.8), dk, x * 1.07, 0.78, zx(1.9));
+            const h = add(
+              new THREE.SphereGeometry(0.2, 16, 12),
+              hl,
+              x * 0.72,
+              0.9,
+              -2.05
+            );
+            h.scale.set(1.7, 0.55, 0.9);
+            h.rotation.y = -x * 0.3;
+            add(dg, dk, x * 0.58, 0.8, 2.45).rotation.x = Math.PI / 2;
+            add(rg, tl, x * 0.58, 0.8, 2.47).rotation.x = Math.PI / 2;
+          }
+          add(BX(1.3, 0.14, 0.06), dk, 0, 0.55, -2.5);
+        }
+        // wheels
+        const W = WHS[k],
+          tg = new THREE.TorusGeometry(0.33, 0.14, 14, 28),
+          tm = new THREE.MeshStandardMaterial({
+            color: 0x101010,
+            roughness: 0.95,
+          }),
+          rg2 = new THREE.CylinderGeometry(0.3, 0.3, 0.22, 24),
+          rm = new THREE.MeshStandardMaterial({
+            color: W.rim,
+            metalness: 1,
+            roughness: 0.2,
+          }),
+          spm = new THREE.MeshStandardMaterial({
+            color: W.sp,
+            metalness: 0.6,
+            roughness: 0.3,
+          }),
+          sg = new THREE.BoxGeometry(W.sw, 0.5, W.sd);
+        g.wh = [];
+        for (const [x, z] of W.p) {
+          const w = new THREE.Group(),
+            sp = new THREE.Group();
+          const t = new THREE.Mesh(tg, tm);
+          t.rotation.y = Math.PI / 2;
+          const rim = new THREE.Mesh(rg2, rm);
+          rim.rotation.z = Math.PI / 2;
+          sp.add(t, rim);
+          for (let i = 0; i < W.n; i++) {
+            const b = new THREE.Mesh(sg, spm);
+            b.position.x = x > 0 ? 0.12 : -0.12;
+            b.rotation.x = (i * Math.PI) / W.n;
+            sp.add(b);
+          }
+          w.add(sp);
+          w.position.set(x, 0.47, z);
+          g.add(w);
+          g.wh.push(sp);
+        }
+        g.traverse((o) => {
+          if (o.isMesh) o.castShadow = true;
+        });
+        const fl = new THREE.Group(),
+          fm = (c, o) =>
+            new THREE.MeshBasicMaterial({
+              color: c,
+              transparent: true,
+              opacity: o,
+              blending: THREE.AdditiveBlending,
+              depthWrite: false,
+            });
+        for (const x of [-0.4, 0.4]) {
+          const o1 = new THREE.Mesh(
+              new THREE.ConeGeometry(0.2, 2.4, 10).translate(0, 1.2, 0),
+              fm(0xff5a00, 0.75)
+            ),
+            o2 = new THREE.Mesh(
+              new THREE.ConeGeometry(0.1, 1.5, 10).translate(0, 0.75, 0),
+              fm(0xffe27a, 0.95)
+            );
+          o1.position.x = o2.position.x = x;
+          fl.add(o1, o2);
+        }
+        fl.rotation.x = Math.PI / 2;
+        fl.position.set(0, 0.6, 2.45);
+        fl.visible = false;
+        g.add(fl);
+        g.fl = fl;
+        if (pi !== null) {
+          const col = COL[pi]; // player marker: underglow + number plate
+          const gc = document.createElement("canvas");
+          gc.width = gc.height = 128;
+          const x = gc.getContext("2d"),
+            gr = x.createRadialGradient(64, 64, 6, 64, 64, 62);
+          gr.addColorStop(0, col + "cc");
+          gr.addColorStop(1, col + "00");
+          x.fillStyle = gr;
+          x.fillRect(0, 0, 128, 128);
+          const u = new THREE.Mesh(
+            new THREE.PlaneGeometry(4, 6.4),
+            new THREE.MeshBasicMaterial({
+              map: enc(new THREE.CanvasTexture(gc)),
+              transparent: true,
+              depthWrite: false,
+              blending: THREE.AdditiveBlending,
+            })
+          );
+          u.rotation.x = -Math.PI / 2;
+          u.position.y = 0.06;
+          g.add(u);
+          const pc = document.createElement("canvas");
+          pc.width = 140;
+          pc.height = 44;
+          const q = pc.getContext("2d");
+          q.fillStyle = col;
+          q.fillRect(0, 0, 140, 44);
+          q.fillStyle = "#001018";
+          q.font = "bold 32px system-ui,sans-serif";
+          q.textAlign = "center";
+          q.textBaseline = "middle";
+          q.fillText("P" + (pi + 1), 70, 24);
+          const pl = new THREE.Mesh(
+            new THREE.PlaneGeometry(0.7, 0.22),
+            new THREE.MeshBasicMaterial({
+              map: enc(new THREE.CanvasTexture(pc)),
+            })
+          );
+          pl.position.set(0, PL[k][0], PL[k][1]);
+          g.add(pl);
+        }
+        return g;
+      }
+      const SEL = [0, 1];
+      let cars = [],
+        THUMBS = [];
+      function buildCars() {
+        if (FIRE) FIRE.forEach((f) => sc.remove(f.grp));
+        FIRE = [mkFire(), mkFire()];
+        cars.forEach((c) => sc.remove(c));
+        cars = [mkCar(SEL[0], 0)];
+        sc.add(cars[0]);
+      }
+      function makeThumbs() {
+        const w = 440,
+          h = 220;
+        R.setScissorTest(false);
+        R.setPixelRatio(1);
+        R.setSize(w, h);
+        R.setViewport(0, 0, w, h);
+        const s2 = new THREE.Scene();
+        s2.background = new THREE.Color(0x0a1020);
+        s2.environment = sc.environment;
+        s2.add(new THREE.HemisphereLight(0xcfe4ff, 0x222222, 0.5));
+        const dl = new THREE.DirectionalLight(0xfff1d6, 1.6);
+        dl.position.set(-6, 8, -4);
+        s2.add(dl);
+        const fl = new THREE.Mesh(
+          new THREE.CircleGeometry(6, 48),
+          new THREE.MeshStandardMaterial({
+            color: 0x1c2438,
+            roughness: 0.4,
+            metalness: 0.5,
+          })
+        );
+        fl.rotation.x = -Math.PI / 2;
+        s2.add(fl);
+        const cam = new THREE.PerspectiveCamera(32, w / h, 0.5, 100);
+        cam.position.set(-5.6, 2.4, -7);
+        cam.lookAt(0, 0.7, 0);
+        const out = DESIGNS.map((d, i) => {
+          const car = mkCar(i, null);
+          s2.add(car);
+          R.render(s2, cam);
+          const u = cv.toDataURL("image/png");
+          s2.remove(car);
+          return u;
+        });
+        R.setPixelRatio(Math.min(devicePixelRatio, 2));
+        R.setScissorTest(true);
+        return out;
+      }
+      // ---- audio (WebAudio, synthesized)
+      let AC = null,
+        master = null,
+        NB = null,
+        EN = [],
+        MUTE = false,
+        cd = 0,
+        cdn = 4,
+        goT = 0;
+      function audio() {
+        if (AC) {
+          if (AC.state === "suspended") AC.resume();
+          return;
+        }
+        try {
+          AC = new (window.AudioContext || window.webkitAudioContext)();
+          const b = AC.createBuffer(1, AC.sampleRate, AC.sampleRate),
+            d = b.getChannelData(0);
+          for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+          NB = b;
+          master = AC.createGain();
+          master.gain.value = MUTE ? 0 : 0.8;
+          master.connect(AC.destination);
+          EN = [0, 1].map((i) => {
+            const o = AC.createOscillator(),
+              o2 = AC.createOscillator(),
+              f = AC.createBiquadFilter(),
+              g = AC.createGain();
+            o.type = "sawtooth";
+            o2.type = "square";
+            f.type = "lowpass";
+            f.frequency.value = 400;
+            g.gain.value = 0;
+            o.connect(f);
+            o2.connect(f);
+            f.connect(g);
+            g.connect(out(i));
+            o.start();
+            o2.start();
+            return { o, o2, f, g };
+          });
+        } catch (e) {
+          AC = null;
+        }
+      }
+      function out(i) {
+        if (!AC.createStereoPanner) return master;
+        const p = AC.createStereoPanner();
+        p.pan.value = i === 0 ? -0.6 : i === 1 ? 0.6 : 0;
+        p.connect(master);
+        return p;
+      }
+      function tone(f, d, type = "sine", v = 0.2, i = -1, f2 = null, t0 = 0) {
+        if (!AC) return;
+        const t = AC.currentTime + t0,
+          o = AC.createOscillator(),
+          g = AC.createGain();
+        o.type = type;
+        o.frequency.setValueAtTime(f, t);
+        if (f2) o.frequency.exponentialRampToValueAtTime(f2, t + d);
+        g.gain.setValueAtTime(v, t);
+        g.gain.exponentialRampToValueAtTime(0.001, t + d);
+        o.connect(g);
+        g.connect(out(i));
+        o.start(t);
+        o.stop(t + d + 0.02);
+      }
+      function noise(d, f1, f2, v = 0.3, i = -1, q = 1, type = "bandpass") {
+        if (!AC) return;
+        const t = AC.currentTime,
+          s = AC.createBufferSource(),
+          f = AC.createBiquadFilter(),
+          g = AC.createGain();
+        s.buffer = NB;
+        f.type = type;
+        f.Q.value = q;
+        f.frequency.setValueAtTime(f1, t);
+        f.frequency.exponentialRampToValueAtTime(f2, t + d);
+        g.gain.setValueAtTime(0.001, t);
+        g.gain.linearRampToValueAtTime(v, t + d * 0.2);
+        g.gain.exponentialRampToValueAtTime(0.001, t + d);
+        s.connect(f);
+        f.connect(g);
+        g.connect(out(i));
+        s.start(t);
+        s.stop(t + d + 0.05);
+      }
+      const SFX = {
+        count() {
+          tone(660, 0.18, "square", 0.16);
+        },
+        go() {
+          tone(1320, 0.55, "square", 0.2);
+          tone(1760, 0.5, "triangle", 0.12);
+        },
+        ok(i) {
+          tone(784, 0.14, "triangle", 0.22, i);
+          tone(1047, 0.14, "triangle", 0.22, i, null, 0.1);
+          tone(1319, 0.25, "triangle", 0.22, i, null, 0.2);
+        },
+        nitro(i) {
+          noise(1, 300, 4000, 0.55, i, 1.1);
+          tone(110, 0.7, "sawtooth", 0.22, i, 38);
+          noise(0.6, 2000, 6000, 0.18, i, 0.7, "highpass");
+        },
+        bad(i) {
+          tone(220, 0.35, "sawtooth", 0.2, i, 110);
+          tone(160, 0.4, "square", 0.14, i, 70, 0.12);
+        },
+        sw(i) {
+          noise(0.14, 700, 2600, 0.14, i);
+        },
+        skid(i) {
+          noise(0.55, 2600, 1300, 0.16, i, 10);
+        },
+        fin() {
+          [523, 659, 784, 1047, 784, 1047].forEach((f, k) =>
+            tone(f, 0.28, "triangle", 0.22, -1, null, k * 0.14)
+          );
+          tone(1319, 0.8, "triangle", 0.22, -1, null, 0.84);
+        },
+      };
+      function engine() {
+        if (!AC || !run || !me) return;
+        const t = AC.currentTime,
+          s = Math.abs(me.sp),
+          nit = s > 40,
+          gas = K.w || K.arrowup,
+          f = (46 + s * 3.4 + (gas && cd > 0 ? 55 : 0)) * (nit ? 1.12 : 1),
+          e = EN[0];
+        e.o.frequency.setTargetAtTime(f, t, 0.06);
+        e.o2.frequency.setTargetAtTime(f * 0.5, t, 0.06);
+        e.f.frequency.setTargetAtTime(300 + s * 45 + (gas ? 200 : 0), t, 0.06);
+        e.g.gain.setTargetAtTime(
+          0.04 + Math.min(0.07, s * 0.0024) + (nit ? 0.03 : 0),
+          t,
+          0.08
+        );
+      }
+      function silence() {
+        if (AC)
+          EN.forEach((e) => e.g.gain.setTargetAtTime(0, AC.currentTime, 0.08));
+      }
+      function toggleSnd() {
+        MUTE = !MUTE;
+        $("snd").textContent = MUTE ? "🔇" : "🔊";
+        if (master) master.gain.value = MUTE ? 0 : 0.8;
+      }
+      // ---- countdown banner
+      function cdShow(t, c) {
+        const e = $("cd");
+        e.textContent = t;
+        e.style.color = c;
+        e.classList.remove("pop");
+        void e.offsetWidth;
+        e.classList.add("pop");
+      }
+      // ---- nitro fire particles
+      let FIRE = null;
+      const fireTex = (() => {
+        const c = document.createElement("canvas");
+        c.width = c.height = 64;
+        const g = c.getContext("2d"),
+          gr = g.createRadialGradient(32, 32, 2, 32, 32, 30);
+        gr.addColorStop(0, "rgba(255,255,255,1)");
+        gr.addColorStop(0.25, "rgba(255,220,120,.9)");
+        gr.addColorStop(0.6, "rgba(255,110,20,.45)");
+        gr.addColorStop(1, "rgba(255,60,0,0)");
+        g.fillStyle = gr;
+        g.fillRect(0, 0, 64, 64);
+        return enc(new THREE.CanvasTexture(c));
+      })();
+      function mkFire() {
+        const grp = new THREE.Group(),
+          ps = [];
+        for (let i = 0; i < 70; i++) {
+          const m = new THREE.SpriteMaterial({
+              map: fireTex,
+              color: 0xffffff,
+              transparent: true,
+              depthWrite: false,
+              blending: THREE.AdditiveBlending,
+              fog: false,
+            }),
+            s = new THREE.Sprite(m);
+          s.visible = false;
+          grp.add(s);
+          ps.push({ s, m, l: 0, ml: 1, vx: 0, vy: 0, vz: 0 });
+        }
+        sc.add(grp);
+        return { grp, ps, acc: 0, n: 0 };
+      }
+      const FC = new THREE.Color();
+      function fire(i, c, p, dt) {
+        const F = FIRE[i];
+        F.acc += p.sp > 40 ? dt * 170 : 0;
+        while (F.acc >= 1) {
+          F.acc--;
+          const q = F.ps.find((x) => x.l <= 0);
+          if (!q) break;
+          F.n++;
+          const sd = F.n % 2 ? -1 : 1;
+          q.l = q.ml = 0.16 + Math.random() * 0.16;
+          q.s.position.set(
+            c.position.x + sd * 0.4 + (Math.random() - 0.5) * 0.15,
+            0.55 + Math.random() * 0.2,
+            c.position.z + 2.5
+          );
+          q.vx = sd * Math.random() * 1.5 + (Math.random() - 0.5);
+          q.vy = Math.random() * 1.8 + 0.3;
+          q.vz = 3 + Math.random() * 5;
+          q.s.visible = true;
+        }
+        F.ps.forEach((q) => {
+          if (q.l <= 0) {
+            q.s.visible = false;
+            return;
+          }
+          q.l -= dt;
+          const f = Math.max(0, q.l / q.ml),
+            s = q.s.position;
+          s.x += q.vx * dt;
+          s.y += q.vy * dt;
+          s.z += q.vz * dt;
+          FC.setRGB(1, 0.25 + f * 0.65, f * f * 0.3);
+          q.m.color.copy(FC);
+          const dz = s.z - c.position.z;
+          q.m.opacity = Math.max(
+            0,
+            Math.min(1, f * 1.6) * Math.min(1, (7 - dz) / 3)
+          );
+          const z = 0.25 + f * 0.85;
+          q.s.scale.set(z, z, 1);
+        });
+      }
+      let GG = null;
+      function gates() {
+        if (GG) sc.remove(GG);
+        GG = new THREE.Group();
+        const m = new THREE.MeshStandardMaterial({
+          color: 0x6a717d,
+          metalness: 0.7,
+          roughness: 0.35,
+        });
+        const bx = (g, w, h, d, x, y) => {
+          const o = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m);
+          o.position.set(x, y, 0);
+          o.castShadow = true;
+          g.add(o);
+        };
+        Q.forEach((q, i) => {
+          const g = new THREE.Group();
+          bx(g, 1, 15, 1, -13.5, 7.5);
+          bx(g, 1, 15, 1, 13.5, 7.5);
+          bx(g, 28, 1.2, 1, 0, 13.8);
+          const qb = board(24, 4.5, q.t, 1024, 192, 70, "#ffffff");
+          qb.position.set(0, 11, 0.4);
+          g.add(qb);
+          q.o.forEach((a, k) => {
+            const ab = board(7, 3.4, String(a), 384, 184, 120, BD[k]);
+            ab.position.set((k - 1) * LW, 6.3, 0.4);
+            g.add(ab);
+          });
+          g.position.z = -(i + 1) * GAP;
+          GG.add(g);
+        });
+        const g = new THREE.Group(),
+          fb = board(24, 4.5, "🏁 FINISH 🏁", 1024, 192, 100, "#fff");
+        fb.position.set(0, 11, 0);
+        g.add(fb);
+        bx(g, 1, 15, 1, -13.5, 7.5);
+        bx(g, 1, 15, 1, 13.5, 7.5);
+        g.position.z = -FIN;
+        GG.add(g);
+        sc.add(GG);
+      }
+      // ---- game (online PvP)
+      let phase = "menu",
+        ROOM = null,
+        RM = null,
+        ROLE = "",
+        CODE = "",
+        oppId = null,
+        ROUND = 0,
+        LVL = 0,
+        lvl = 0,
+        run = false,
+        last = 0,
+        T = 0,
+        K = {},
+        Q = [],
+        me = null,
+        op = { d: 0, sp: 0 },
+        lastNet = 0,
+        lastSeen = 0;
+      const mk = () => ({
+        d: 0,
+        sp: 0,
+        lane: 1,
+        lx: 1,
+        gi: 0,
+        sc: 0,
+        st: 0,
+        ok: 0,
+        msg: "",
+        mt: 0,
+        mc: "#fff",
+        t: null,
+        ds: 0,
+        br: false,
+        brp: false,
+        tAt: 0,
+      });
+      const mulberry = (a) => () => {
+        a |= 0;
+        a = (a + 0x6d2b79f5) | 0;
+        let t = Math.imul(a ^ (a >>> 15), 1 | a);
+        t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+      };
+      const rcode = () =>
+        Array.from(
+          { length: 4 },
+          () => "ABCDEFGHJKLMNPQRSTUVWXYZ"[Math.floor(Math.random() * 24)]
+        ).join("");
+      function mkQ() {
+        const [t, a] = gens[lvl]();
+        let o = [a];
+        while (o.length < 3) {
+          let d = a + r(-7, 7);
+          if (d !== a && !o.includes(d)) o.push(d);
+        }
+        for (let i = 2; i > 0; i--) {
+          const j = Math.floor(RNG() * (i + 1));
+          [o[i], o[j]] = [o[j], o[i]];
+        }
+        return { t, o, cl: o.indexOf(a) };
+      }
+      // ---- menus
+      function menu() {
+        phase = "menu";
+        const o = $("ov");
+        o.style.display = "flex";
+        o.innerHTML =
+          `<div class="in"><div style="font-size:30px">🏎️💨🏎️</div><details><summary>Cara bermain</summary><p>Balapan online 1 lawan 1! Kamu hanya melihat mobilmu sendiri, tapi <b>progres & jarak kedua mobil</b> tampil di atas layar. Masuk ke jalur yang papan jawabannya benar untuk dapat NITRO; salah = melambat. Yang sampai finish duluan menang.<br>Tunggu aba-aba <b>3-2-1-GO!</b><br><b>A/D</b> pindah jalur · <b>W</b> gas · <b>S</b> rem lalu mundur<br>(HP: tap jalur untuk pindah; gas/rem perlu keyboard)</p></details>` +
+          `<h3>PILIH MOBILMU</h3><div class="row3">${DESIGNS.map(
+            (d, k) =>
+              `<div class="card${SEL[0] === k ? " on" : ""}" style="--c:${
+                COL[0]
+              }" data-k="${k}"><img src="${THUMBS[k]}" alt="${d.name}"><span>${
+                d.name
+              }</span><small>${d.sub}</small></div>`
+          ).join("")}</div>` +
+          `<h3>LEVEL (ditentukan pembuat room)</h3><div class="lvs">${[
+            "Lv1 · 12-13",
+            "Lv2 · 14-15",
+            "Lv3 · 16-17",
+          ]
+            .map(
+              (t, i) =>
+                `<button class="lvb${
+                  LVL === i ? " on" : ""
+                }" data-l="${i}">${t}</button>`
+            )
+            .join("")}</div>` +
+          `<div class="lv"><button onclick="createRoom()"${
+            RM ? "" : " disabled"
+          }>Buat Room</button><div class="jn"><input id="code" maxlength="4" placeholder="KODE" autocomplete="off"><button onclick="joinRoom()"${
+            RM ? "" : " disabled"
+          }>Gabung</button></div><button class="alt" onclick="soloStart()">Latihan Solo</button></div>` +
+          `<p class="note">${
+            RM
+              ? "Buat room lalu kirim kodenya ke lawan, atau masukkan kode dari temanmu. Kedua pemain membuka alamat game yang sama."
+              : "Mode online tidak tersedia (file net.js gagal dimuat). Latihan solo tetap bisa."
+          }<br>Desain terinspirasi merek, bukan replika resmi · hanya tampilan</p></div>`;
+      }
+      $("ov").addEventListener("click", (e) => {
+        const c = e.target.closest(".card");
+        if (c) {
+          SEL[0] = +c.dataset.k;
+          document
+            .querySelectorAll(".card")
+            .forEach((x) => x.classList.toggle("on", x === c));
+          return;
+        }
+        const l = e.target.closest(".lvb");
+        if (l) {
+          LVL = +l.dataset.l;
+          document
+            .querySelectorAll(".lvb")
+            .forEach((x) => x.classList.toggle("on", x === l));
+        }
+      });
+      function showWait(msg) {
+        const h = ROLE === "host";
+        $("ov").style.display = "flex";
+        $(
+          "ov"
+        ).innerHTML = `<div class="in"><div style="font-size:30px">📡</div><h3>ROOM <span style="letter-spacing:4px;color:var(--c1);font-size:26px">${CODE || "····"}</span></h3><p>${
+          msg ||
+          (h
+            ? "Kirim kode ini ke lawanmu. Dia membuka link game yang sama, pilih “Gabung”, lalu masukkan kode. Menunggu lawan…"
+            : "Terhubung. Mencari host…")
+        }</p><button class="alt" onclick="leaveRoom()">Batal</button></div>`;
+      }
+      // ---- online flow
+      async function createRoom() {
+        if (!RM) return;
+        ROLE = "host";
+        CODE = "";
+        await enter();
+      }
+      async function joinRoom() {
+        if (!RM) return;
+        const c = $("code").value.trim().toUpperCase();
+        if (c.length !== 4) {
+          $("code").focus();
+          return;
+        }
+        CODE = c;
+        ROLE = "guest";
+        await enter();
+      }
+      async function enter() {
+        audio();
+        phase = "wait";
+        oppId = null;
+        ROUND = 0;
+        showWait("Menghubungkan…");
+        try {
+          const r = await RM.join(CODE, ROLE);
+          ROOM = r;
+          CODE = r.code;
+          r.onPeers(onPeers);
+          r.onClose(() => {
+            if (ROOM !== r) return;
+            ROOM = null;
+            if (!run) {
+              phase = "wait";
+              showWait("Room sudah ditutup atau koneksi terputus.");
+            }
+          });
+          await r.presence({ role: ROLE, car: SEL[0], round: 0 });
+          showWait();
+          onPeers();
+        } catch (e) {
+          ROOM = null;
+          ROLE = "";
+          showWait((e && e.message) || "Gagal terhubung, coba lagi.");
+        }
+      }
+      function oppPeer() {
+        if (!ROOM) return null;
+        const ps = ROOM.peers();
+        return ROLE === "host"
+          ? ps.find((p) => p.peer === oppId)
+          : ps.find((p) => !p.isMe && p.presence.role === "host");
+      }
+      function onPeers() {
+        if (!ROOM) return;
+        const ps = ROOM.peers();
+        if (ROLE === "host") {
+          if (oppId && !run && !ps.some((p) => p.peer === oppId)) {
+            oppId = null;
+            if (phase === "wait") showWait();
+          }
+          if (!oppId) {
+            const g = ps.find((p) => !p.isMe && p.presence.role === "guest");
+            if (g) {
+              oppId = g.peer;
+              ROOM.presence({ opp: oppId }).catch(() => {});
+              if (phase === "wait") {
+                showWait("Lawan terhubung! Balapan dimulai sebentar lagi…");
+                setTimeout(beginRound, 1500);
+              }
+            }
+          }
+        } else {
+          const h = ps.find((p) => !p.isMe && p.presence.role === "host"),
+            m = ps.find((p) => p.isMe && p.sameTab);
+          if (!h || !m) {
+            return;
+          }
+          if (phase === "wait") ROOM.hot(true);
+          const pr = h.presence;
+          if (
+            pr.opp === m.peer &&
+            pr.round > ROUND &&
+            !run &&
+            (phase === "wait" || phase === "done")
+          ) {
+            ROUND = pr.round;
+            startRace(pr.seed, pr.lvl);
+          } else if (phase === "wait")
+            showWait(
+              pr.opp && pr.opp !== m.peer
+                ? "Room sudah penuh (host sedang bermain dengan orang lain)."
+                : "Host ditemukan ✔ Menunggu host memulai…"
+            );
+        }
+      }
+      function beginRound() {
+        if (!ROOM || ROLE !== "host" || !oppId || run || phase === "starting") return;
+        ROUND++;
+        const seed = Math.floor(Math.random() * 1e9);
+        ROOM.hot(true);
+        phase = "starting";
+        ROOM.presence({
+          round: ROUND,
+          seed,
+          lvl: LVL,
+          opp: oppId,
+          d: 0,
+          sp: 0,
+          gi: 0,
+          ok: 0,
+          sc: 0,
+          ft: null,
+          car: SEL[0],
+        }).catch(() => {});
+        const r = ROOM,
+          rd = ROUND;
+        // beri waktu sebentar agar perangkat lawan menerima ronde baru sebelum hitung mundur
+        setTimeout(() => {
+          if (ROOM === r && ROUND === rd) startRace(seed, LVL);
+        }, 600);
+      }
+      function rematch() {
+        beginRound();
+      }
+      function soloStart() {
+        ROLE = "solo";
+        audio();
+        startRace(Math.floor(Math.random() * 1e9), LVL);
+      }
+      function leaveRoom() {
+        run = false;
+        silence();
+        $("cd").textContent = "";
+        if (ROOM) {
+          ROOM.leave().catch(() => {});
+          ROOM = null;
+        }
+        ROLE = "";
+        oppId = null;
+        menu();
+      }
+      // ---- race
+      function startRace(seed, l) {
+        if (run) return;
+        lvl = l;
+        audio();
+        RNG = mulberry(seed);
+        Q = Array.from({ length: NG }, mkQ);
+        RNG = Math.random;
+        me = mk();
+        op = { d: 0, sp: 0 };
+        T = 0;
+        cd = 3;
+        cdn = 4;
+        goT = 0;
+        $("cd").textContent = "";
+        buildCars();
+        $("p0").textContent = "WASD · " + DESIGNS[SEL[0]].name;
+        $("rowo").style.display = ROLE === "solo" ? "none" : "flex";
+        gates();
+        $("ov").style.display = "none";
+        phase = "race";
+        run = true;
+        last = performance.now();
+        lastNet = 0;
+        lastSeen = last;
+        showQ();
+        if (ROOM && ROLE !== "solo") ROOM.hot(true);
+        if (ROOM && ROLE !== "solo")
+          ROOM.presence({
+            round: ROUND,
+            d: 0,
+            sp: 0,
+            gi: 0,
+            ok: 0,
+            sc: 0,
+            ft: null,
+            car: SEL[0],
+          }).catch(() => {});
+        requestAnimationFrame(loop);
+      }
+      function showQ() {
+        $("q0").textContent = me.gi < NG ? Q[me.gi].t : "Menuju finish! 🏁";
+      }
+      function mv(n) {
+        if (run && cd <= 0) {
+          const l = Math.max(0, Math.min(2, n));
+          if (l !== me.lane) SFX.sw(-1);
+          me.lane = l;
+        }
+      }
+      addEventListener("keydown", (e) => {
+        const k = e.key.toLowerCase();
+        if (run && k.startsWith("arrow")) e.preventDefault();
+        K[k] = 1;
+        if (!run || cd > 0) return;
+        if (k === "a" || k === "arrowleft") mv(me.lane - 1);
+        if (k === "d" || k === "arrowright") mv(me.lane + 1);
+      });
+      addEventListener("keyup", (e) => {
+        K[e.key.toLowerCase()] = 0;
+      });
+      const tap = (e) => {
+        if (!run) return;
+        const b = cv.getBoundingClientRect();
+        mv(Math.floor(((e.clientX - b.left) / b.width) * 3));
+      };
+      cv.addEventListener("pointerdown", tap);
+      cv.addEventListener("pointermove", (e) => {
+        if (e.buttons) tap(e);
+      });
+      function loop(n) {
+        if (!run) return;
+        const dt = Math.min((n - last) / 1000, 0.05);
+        last = n;
+        upd(dt);
+        readOpp(dt);
+        net(n);
+        check(n);
+        if (run) frame(dt);
+        requestAnimationFrame(loop);
+      }
+      function upd(dt) {
+        if (cd > 0) {
+          cd -= dt;
+          const n = Math.ceil(cd);
+          if (n > 0 && n !== cdn) {
+            cdn = n;
+            cdShow(n, "#ffd400");
+            SFX.count();
+          }
+          if (cd <= 0) {
+            cdShow("GO!", "#3dff7a");
+            SFX.go();
+            goT = 0.9;
+          }
+          return;
+        }
+        if (goT > 0) {
+          goT -= dt;
+          if (goT <= 0) $("cd").textContent = "";
+        }
+        T += dt;
+        const p = me,
+          g = K.w || K.arrowup,
+          b = K.s || K.arrowdown;
+        p.lx += (p.lane - p.lx) * Math.min(1, dt * 10);
+        p.brp = p.br;
+        p.br = false;
+        if (g && !b) {
+          p.sp += (p.sp < 0 ? 30 : 14) * dt;
+        } else if (b) {
+          if (!p.brp && p.sp > 18) SFX.skid(-1);
+          p.br = true;
+          p.sp -= (p.sp > 0 ? 32 : 9) * dt;
+        } else
+          p.sp -=
+            Math.sign(p.sp) *
+            Math.min(Math.abs(p.sp), (3 + Math.abs(p.sp) * 0.06) * dt);
+        if (p.sp > 38) p.sp -= Math.min(p.sp - 38, 16 * dt);
+        if (p.sp < -9) p.sp = -9;
+        const o = p.d;
+        p.d = Math.max(0, p.d + p.sp * dt);
+        if (p.d === 0 && p.sp < 0) p.sp = 0;
+        p.ds = p.d - o;
+        p.mt -= dt;
+        if (p.gi < NG && p.d >= (p.gi + 1) * GAP) {
+          const q = Q[p.gi];
+          if (p.lane === q.cl) {
+            p.sp = 52;
+            p.st++;
+            p.ok++;
+            p.sc += 100 + p.st * 20;
+            p.msg = "NITRO! 🔥";
+            p.mc = COL[0];
+            SFX.ok(-1);
+            SFX.nitro(-1);
+          } else {
+            SFX.bad(-1);
+            p.sp = 4;
+            p.st = 0;
+            p.msg = "Salah! = " + q.o[q.cl];
+            p.mc = "#ff5577";
+          }
+          p.mt = 1.5;
+          p.gi++;
+          showQ();
+        }
+        if (p.d >= FIN && p.t === null) p.t = T;
+      }
+      function readOpp(dt) {
+        const pe = oppPeer(),
+          pr = pe && pe.presence;
+        if (pr && pr.round === ROUND) {
+          op.sp = pr.sp || 0;
+          const age = Math.min(0.8, Math.max(0, (performance.now() - (pe.at || 0)) / 1000));
+          op.d +=
+            ((pr.d || 0) + op.sp * (age + 0.12) - op.d) * Math.min(1, dt * 8);
+          if (pr.ft != null) op.d = FIN;
+        }
+      }
+      function net(n) {
+        if (!ROOM || ROLE === "solo" || n - lastNet < 80) return;
+        lastNet = n;
+        ROOM.presence({
+          round: ROUND,
+          d: +me.d.toFixed(1),
+          sp: +me.sp.toFixed(1),
+          gi: me.gi,
+          ok: me.ok,
+          sc: me.sc,
+          ft: me.t,
+        }).catch(() => {});
+      }
+      function check(n) {
+        if (ROLE === "solo") {
+          if (me.t !== null) finish("win");
+          return;
+        }
+        const pe = oppPeer(),
+          pr = pe && pe.presence.round === ROUND ? pe.presence : null;
+        if (pe) lastSeen = n;
+        else if (n - lastSeen > 4000)
+          return finish("win", "Lawan keluar dari room.");
+        const oft = pr && pr.ft != null ? pr.ft : null;
+        if (me.t !== null) {
+          if (!me.tAt) me.tAt = n;
+          if (oft !== null) finish(me.t <= oft ? "win" : "lose");
+          else if (n - me.tAt > 4000) finish("win");
+        } else if (oft !== null) finish("lose");
+      }
+      function finish(res, msg) {
+        if (!run) return;
+        run = false;
+        phase = "done";
+        if (ROOM && ROLE !== "solo")
+          ROOM.presence({ d: +me.d.toFixed(1), ft: me.t }).catch(() => {});
+        if (ROOM && ROLE !== "solo") ROOM.hot(false);
+        const win = res === "win";
+        if (win) SFX.fin();
+        else SFX.bad(-1);
+        silence();
+        const o = $("ov");
+        o.style.display = "flex";
+        o.innerHTML =
+          `<div class="in"><div style="font-size:42px">${
+            win ? "🏆" : "💥"
+          }</div><h2 style="margin:0;color:${win ? "#3dff7a" : "#ff5577"}">${
+            win ? "KAMU MENANG!" : "KAMU KALAH"
+          }</h2><p>${msg ? msg + "<br>" : ""}Jarakmu: ${Math.round(
+            Math.min(me.d, FIN)
+          )} m · Benar ${me.ok}/${NG} · Skor ${me.sc}${
+            ROLE === "solo"
+              ? ""
+              : `<br>Lawan: ${Math.round(Math.min(op.d, FIN))} m`
+          }${
+            me.t !== null ? `<br>Waktumu: ${me.t.toFixed(1)} detik` : ""
+          }</p>` +
+          (ROLE === "guest"
+            ? "<p>Menunggu host memulai ulang…</p>"
+            : ROLE === "host"
+            ? '<button onclick="rematch()">Main lagi</button>'
+            : '<button onclick="soloStart()">Main lagi</button>') +
+          '<button class="alt" onclick="leaveRoom()">Keluar ke menu</button></div>';
+      }
+      function hud() {
+        const p = me,
+          solo = ROLE === "solo";
+        $("pm").style.width = Math.min(100, (p.d / FIN) * 100) + "%";
+        $("po").style.width = Math.min(100, (op.d / FIN) * 100) + "%";
+        $("dm").textContent = Math.round(Math.min(p.d, FIN)) + " m";
+        $("do").textContent = Math.round(Math.min(op.d, FIN)) + " m";
+        const gp = Math.round(p.d - op.d),
+          G = $("gap");
+        G.textContent = solo
+          ? ""
+          : gp >= 0
+          ? `Unggul ${gp} m`
+          : `Tertinggal ${-gp} m`;
+        G.style.color = gp >= 0 ? "#3dff7a" : "#ff5577";
+        $("s0").innerHTML = `${p.sp < -0.3 ? "R " : ""}${Math.round(
+          Math.abs(p.sp) * 3.6
+        )} km/h · Skor ${p.sc} · 🔥${p.st} · ${Math.min(p.gi + 1, NG)}/${NG}`;
+        const m = $("m0");
+        m.textContent = p.mt > 0 ? p.msg : "";
+        m.style.color = p.mc;
+      }
+      function frame(dt = 0) {
+        const w = cv.clientWidth,
+          h = cv.clientHeight,
+          p = me,
+          c = cars[0];
+        c.position.set((p.lx - 1) * LW, 0, -p.d);
+        c.rotation.y = (p.lx - p.lane) * 0.3 * Math.min(1, Math.abs(p.sp) / 10);
+        c.fl.visible = p.sp > 40;
+        c.fl.scale.y = 0.6 + Math.random() * 0.6;
+        fire(0, c, p, dt);
+        c.tl.color.setHex(p.br ? 0xff2030 : 0x801018);
+        c.wh.forEach((x) => (x.rotation.x -= p.ds / 0.47));
+        const cam = cams[0],
+          shk = p.sp > 40 ? (Math.random() - 0.5) * 0.1 : 0;
+        cam.position.set((p.lx - 1) * LW * 0.8 + shk, 3.5, -p.d + 9);
+        cam.lookAt((p.lx - 1) * LW * 0.5, 1.5, -p.d - 20);
+        cam.fov = 60 + Math.max(0, p.sp - 25) * 0.35;
+        cam.aspect = w / h;
+        cam.updateProjectionMatrix();
+        hud();
+        engine();
+        render();
+      }
+      function render() {
+        const w = cv.clientWidth,
+          h = cv.clientHeight,
+          p = run ? me : null,
+          px = p ? (p.lx - 1) * LW : 0,
+          pz = p ? -p.d : 0;
+        sun.target.position.set(px, 0, pz - 8);
+        sun.position.set(px - 34, 68, pz + 20);
+        sun.target.updateMatrixWorld();
+        sky.position.copy(cams[0].position);
+        R.setViewport(0, 0, w, h);
+        R.setScissor(0, 0, w, h);
+        R.render(sc, cams[0]);
+      }
+      function resize() {
+        const w = Math.min(innerWidth - 16, 964),
+          h = Math.max(300, Math.min(innerHeight - 90, w * 0.55));
+        R.setSize(w, h);
+        $("wrap").style.width = w + "px";
+        $("wrap").style.height = h + "px";
+        const c = cams[0];
+        c.aspect = w / h;
+        c.updateProjectionMatrix();
+        c.position.set(0, 3.6, 9);
+        c.lookAt(0, 1.6, -20);
+        if (cars[0]) cars[0].position.set(0, 0, 0);
+        render();
+      }
+      addEventListener("resize", resize);
+      addEventListener("pagehide", () => {
+        if (ROOM && ROOM.beacon) ROOM.beacon();
+      });
+      buildCars();
+      THUMBS = makeThumbs();
+      resize();
+      menu();
+      (async () => {
+        try {
+          RM = window.MRNet ? window.MRNet.makeRM() : null;
+        } catch (e) {
+          RM = null;
+        }
+        if (phase === "menu") menu();
+      })();
+    </script>
+  </body>
+</html>

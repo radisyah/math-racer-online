@@ -1,0 +1,98 @@
+'use strict';
+/* Tes API room + transport klien (dua klien sungguhan lewat net.js ke dev server, penyimpanan memori). */
+const assert = require('assert');
+const { start } = require('../dev-server.js');
+const { makeRM } = require('../public/net.js');
+
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+async function until(fn, ms = 4000, what = 'kondisi') {
+  const t = Date.now();
+  while (Date.now() - t < ms) { if (fn()) return; await sleep(25); }
+  throw new Error('timeout menunggu ' + what);
+}
+
+(async () => {
+  const srv = await start(0);
+  const base = 'http://127.0.0.1:' + srv.address().port + '/api/room';
+  const raw = (b) => fetch(base, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(b) }).then(async r => ({ s: r.status, j: await r.json() }));
+  let n = 0; const ok = m => console.log('  ok ' + (++n) + ' ' + m);
+
+  // ---- API mentah
+  let r = await raw({ action: 'create' });
+  assert.strictEqual(r.s, 200); assert.match(r.j.code, /^[A-Z2-9]{4}$/); assert.strictEqual(r.j.side, 'host'); ok('create → kode 4 karakter');
+  const code = r.j.code, host = r.j;
+  r = await raw({ action: 'join', code: 'ZZZZ' }); assert.strictEqual(r.s, 404); ok('join kode salah → 404');
+  r = await raw({ action: 'join', code: 'ab' }); assert.strictEqual(r.s, 400); ok('join kode pendek → 400');
+  r = await raw({ action: 'join', code: code.toLowerCase() }); assert.strictEqual(r.s, 200); assert.strictEqual(r.j.side, 'guest'); const guest = r.j; ok('join (huruf kecil) → guest');
+  r = await raw({ action: 'join', code }); assert.strictEqual(r.s, 409); ok('join kedua saat kursi aktif → 409');
+  await raw({ action: 'sync', code, side: 'guest', id: guest.id, s: 1, p: { role: 'guest' } });
+  r = await raw({ action: 'join', code }); assert.strictEqual(r.s, 409); ok('guest aktif (ada presence) → tetap penuh');
+  r = await raw({ action: 'sync', code, side: 'host', id: host.id, s: 1, p: { role: 'host', d: 5 } });
+  assert.strictEqual(r.j.o.p.role, 'guest'); assert.strictEqual(r.j.o.id, guest.id); ok('sync host menerima presence guest');
+  r = await raw({ action: 'sync', code, side: 'guest', id: guest.id, s: 2, p: {} });
+  assert.strictEqual(r.j.o.p.d, 5); ok('sync guest menerima presence host');
+  r = await raw({ action: 'sync', code, side: 'host', id: host.id, s: 3, p: { x: 'y'.repeat(2000) } }); assert.strictEqual(r.s, 413); ok('presence terlalu besar ditolak');
+  r = await raw({ action: 'leave', code, side: 'guest', token: 'salah' });
+  r = await raw({ action: 'sync', code, side: 'host', id: host.id, s: 4, p: {} }); assert.ok(r.j.o, 'leave dengan token salah tidak boleh menghapus'); ok('leave token salah diabaikan');
+  await raw({ action: 'leave', code, side: 'guest', token: guest.token });
+  r = await raw({ action: 'sync', code, side: 'host', id: host.id, s: 5, p: {} }); assert.strictEqual(r.j.o, null); ok('guest keluar → presence hilang');
+  r = await raw({ action: 'join', code }); assert.strictEqual(r.s, 200); ok('kursi guest bisa dipakai lagi');
+  await raw({ action: 'leave', code, side: 'host', token: host.token });
+  r = await raw({ action: 'sync', code, side: 'guest', id: r.j.id, s: 1, p: {} }); assert.strictEqual(r.s, 404); assert.strictEqual(r.j.gone, true); ok('host keluar → room ditutup (404 gone)');
+  r = await raw({ action: 'bogus' }); assert.strictEqual(r.s, 400); ok('aksi tak dikenal → 400');
+  r = await fetch(base).then(x => x.status); assert.strictEqual(r, 405); ok('GET ditolak (405)');
+
+  // ---- dua klien lewat transport
+  const RM = makeRM({ api: base, hidden: () => false });
+  const hostRoom = await RM.join(null, 'host');
+  assert.match(hostRoom.code, /^[A-Z2-9]{4}$/);
+  await hostRoom.presence({ role: 'host', car: 0, round: 0 });
+  const guestRoom = await RM.join(hostRoom.code, 'guest');
+  let hostNotified = 0; hostRoom.onPeers(() => hostNotified++);
+  await guestRoom.presence({ role: 'guest', car: 1, round: 0 });
+  await until(() => hostRoom.peers().length === 2 && hostRoom.peers()[1].presence.role === 'guest', 3000, 'host melihat guest');
+  await until(() => guestRoom.peers().length === 2 && guestRoom.peers()[1].presence.role === 'host', 3000, 'guest melihat host');
+  assert.strictEqual(hostRoom.peers()[1].presence.role, 'guest');
+  assert.strictEqual(guestRoom.peers()[1].presence.role, 'host'); ok('klien: kedua sisi saling melihat');
+
+  const t0 = Date.now();
+  hostRoom.presence({ round: 1, seed: 12345, lvl: 2, opp: hostRoom.peers()[1].peer });
+  await until(() => { const p = guestRoom.peers()[1]; return p && p.presence.round === 1; }, 3000, 'guest menerima ronde baru');
+  const lat = Date.now() - t0;
+  assert.strictEqual(guestRoom.peers()[1].presence.seed, 12345);
+  assert.strictEqual(guestRoom.peers()[1].presence.opp, guestRoom.id);
+  assert.ok(typeof guestRoom.peers()[1].at === 'number'); ok('klien: ronde baru (urgent) tiba dalam ' + lat + ' ms');
+
+  hostRoom.hot(true); guestRoom.hot(true);
+  const t1 = Date.now();
+  for (let i = 1; i <= 40; i++) { hostRoom.presence({ d: i * 10 }); await sleep(80); }
+  await until(() => guestRoom.peers()[1].presence.d === 400, 2000, 'jarak terakhir host');
+  const per = Date.now() - t1; ok('klien: 40 pembaruan jarak mengalir (' + per + ' ms), guest melihat nilai terakhir');
+
+  hostRoom.presence({ d: 500, ft: 12.3 });
+  await until(() => guestRoom.peers()[1].presence.ft === 12.3, 2000, 'ft host'); ok('klien: waktu finish (urgent) sampai ke lawan');
+
+  let closed = false; guestRoom.onClose(() => { closed = true; });
+  await hostRoom.leave();
+  await until(() => closed, 4000, 'guest tahu room ditutup'); assert.strictEqual(guestRoom.closed, true); ok('klien: host keluar → guest menerima onClose');
+
+  // guest keluar → host melihat peers menyusut
+  const h2 = await RM.join(null, 'host'); await h2.presence({ role: 'host' });
+  const g2 = await RM.join(h2.code, 'guest'); await g2.presence({ role: 'guest' });
+  await until(() => h2.peers().length === 2, 3000, 'h2 melihat g2');
+  await g2.leave();
+  await until(() => h2.peers().length === 1, 3000, 'h2 melihat g2 keluar'); ok('klien: guest keluar → host melihat lawan hilang');
+  await h2.leave();
+
+  // kegagalan jaringan sesaat tidak dianggap lawan keluar
+  let flaky = false;
+  const RM2 = makeRM({ api: base, hidden: () => false, fetch: (u, o) => (flaky ? Promise.reject(new Error('net')) : fetch(u, o)) });
+  const h3 = await RM2.join(null, 'host'); await h3.presence({ role: 'host' });
+  const g3 = await RM2.join(h3.code, 'guest'); await g3.presence({ role: 'guest' });
+  await until(() => h3.peers().length === 2, 3000, 'h3 melihat g3');
+  flaky = true; await sleep(1800); flaky = false;
+  assert.strictEqual(h3.peers().length, 2); assert.strictEqual(h3.closed, false); ok('klien: gangguan jaringan sesaat tidak memutus lawan');
+  await h3.leave(); await g3.leave();
+
+  srv.close(); console.log('\nSemua tes lulus (' + n + ').'); process.exit(0);
+})().catch(e => { console.error('GAGAL:', e); process.exit(1); });
