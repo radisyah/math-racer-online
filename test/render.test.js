@@ -10,7 +10,7 @@ const ctxProxy=()=>{ const st={}; return new Proxy(function(){}, {
 const els={};
 const mkEl=(id)=>({id,style:{},classList:{add(){},remove(){}},addEventListener(){},getBoundingClientRect:()=>({left:0,top:0,width:600,height:400}),
   getContext:()=>ctxProxy(),set innerHTML(v){this._h=v;},get innerHTML(){return this._h||''},textContent:'',offsetWidth:0,value:'',focus(){},toDataURL:()=>'data:x',width:0,height:0,querySelectorAll:()=>[]});
-const document={getElementById:id=>{ if(id==='wg') return (els.ov&&els.ov._h&&els.ov._h.includes('id="wg"')) ? (els.wg||(els.wg=mkEl('wg'))) : null; return els[id]||(els[id]=mkEl(id)); },createElement:()=>mkEl('c'),querySelectorAll:()=>[],hidden:false};
+const document={getElementById:id=>{ if(id==='wg') return (els.ov&&els.ov._h&&els.ov._h.includes('id="wg"')) ? (els.wg||(els.wg=mkEl('wg'))) : null; return els[id]||(els[id]=mkEl(id)); },createElement:()=>mkEl('c'),querySelectorAll:()=>[],hidden:false,body:{classList:{add(){},remove(){}}}};
 let rafq=[]; 
 const win={innerWidth:420,innerHeight:800,devicePixelRatio:2,addEventListener(){},document,
   requestAnimationFrame:f=>{rafq.push(f);},performance:{now:()=>T0},MRNet:null,AudioContext:undefined};
@@ -97,5 +97,58 @@ assert.ok(!t.run && ovText().includes('terlalu lama'), '7: '+ovText());
 // 8) skor sama persis → jawaban benar sama → waktu tercepat menentukan (pesan seri-skor tampil)
 play({round:1,get sc(){return t.me.sc},ok:10,ft:200,gi:10},0);
 assert.ok(ovText().includes('KAMU MENANG') && ovText().includes('Skor sama'), '8: '+ovText());
+
+// ---- Room Master: dua panel, soal dari seed yang sama, hasil dihitung dari kedua pemain
+{
+  const T1=T0; rafq.length=0;
+  let pres={host:{role:'host',car:0,round:1,seed:123,lvl:0,gi:0,ok:0,sc:0,ft:null,d:0,sp:0,ln:1},
+            guest:{role:'guest',car:2,round:1,gi:0,ok:0,sc:0,ft:null,d:0,sp:0,ln:1}};
+  let hotCalls=[];
+  ctx.__peers=()=>[{isMe:true,presence:{}},
+    {peer:'h',side:'host',isMe:false,presence:pres.host,at:T0},
+    {peer:'g',side:'guest',isMe:false,presence:pres.guest,at:T0}];
+  ctx.__hot=v=>hotCalls.push(v);
+  vm.runInContext('run=false; ROLE="master"; CODE="ABCD"; ROOM={peers:()=>__peers(),presence(){return Promise.resolve()},hot:__hot,leave(){return Promise.resolve()}}; startWatch();',ctx);
+  const frame=(n=1)=>{ for(let i=0;i<n && rafq.length;i++){ const fn=rafq.shift(); T0+=16.7; fn(T0);} };
+  const mv=vm.runInContext('MV',ctx);
+  assert.ok(vm.runInContext('document.body.classList',ctx)!==undefined);
+  frame(3);
+  const mvv=()=>vm.runInContext('MV',ctx);
+  assert.strictEqual(mvv().round,1,'master harus mengikuti ronde host');
+  assert.strictEqual(mvv().Q.length,10,'master membangun soal dari seed');
+  // soal master identik dengan soal pemain dengan seed yang sama
+  vm.runInContext('ROLE="host";oppId="x";ROUND=1;ROOM2=ROOM;ROOM={peers:()=>[],presence(){return Promise.resolve()},hot(){},leave(){return Promise.resolve()}};startRace(123,0);',ctx);
+  const qPlayer=JSON.stringify(t.Q.map(q=>q.t)); vm.runInContext('run=false;ROLE="master";ROOM=ROOM2;',ctx);
+  assert.strictEqual(JSON.stringify(mvv().Q.map(q=>q.t)),qPlayer,'soal master = soal pemain');
+  rafq.length=0; vm.runInContext('requestAnimationFrame(mLoop)',ctx);
+  // posisi pemain dikirim → panel bergerak
+  const at0=calls;
+  pres.host={...pres.host,d:700,sp:60,gi:0}; pres.guest={...pres.guest,d:300,sp:40,ln:2};
+  ctx.__peers=()=>[{isMe:true,presence:{}},{peer:'h',side:'host',isMe:false,presence:pres.host,at:T0},{peer:'g',side:'guest',isMe:false,presence:pres.guest,at:T0}];
+  frame(90);
+  const pl=mvv().pl;
+  assert.ok(pl[0].d>600 && pl[1].d>250 && pl[0].d>pl[1].d, 'posisi kedua pemain terlihat: '+pl[0].d+' / '+pl[1].d);
+  assert.ok(calls>at0 && texts.some(x=>/PEMAIN 1/.test(String(x))) && texts.some(x=>/PEMAIN 2/.test(String(x))),'dua panel digambar');
+  // jawaban benar / salah memunculkan pesan, dan hanya host yang memulai ronde (master tidak bisa mengontrol)
+  pres.host={...pres.host,gi:1,ok:1,sc:150,d:900}; pres.guest={...pres.guest,gi:1,ok:0,sc:-50,d:800};
+  ctx.__peers=()=>[{isMe:true,presence:{}},{peer:'h',side:'host',isMe:false,presence:pres.host,at:T0},{peer:'g',side:'guest',isMe:false,presence:pres.guest,at:T0}];
+  frame(5);
+  assert.ok(/NITRO/.test(mvv().pl[0].msg) && /Salah/.test(mvv().pl[1].msg),'pesan benar/salah per pemain');
+  assert.ok(hotCalls.includes(true),'master sync cepat saat balapan');
+  // kedua pemain finish → pemenang ditentukan dari skor
+  pres.host={...pres.host,gi:10,ok:10,sc:1200,ft:100,d:7300,sp:0}; pres.guest={...pres.guest,gi:10,ok:9,sc:900,ft:95,d:7300,sp:0};
+  ctx.__peers=()=>[{isMe:true,presence:{}},{peer:'h',side:'host',isMe:false,presence:pres.host,at:T0},{peer:'g',side:'guest',isMe:false,presence:pres.guest,at:T0}];
+  frame(5);
+  assert.strictEqual(mvv().res.r,'win','skor tertinggi (host) menang walau guest finish lebih cepat');
+  assert.ok(hotCalls[hotCalls.length-1]===false,'sync normal lagi setelah hasil keluar');
+  assert.ok(texts.some(x=>/PEMAIN 1 MENANG/.test(String(x))),'banner pemenang digambar');
+  // ronde baru dari host me-reset panel
+  pres.host={...pres.host,round:2,seed:999,gi:0,ok:0,sc:0,ft:null,d:0,sp:0}; pres.guest={...pres.guest,round:2,gi:0,ok:0,sc:0,ft:null,d:0,sp:0};
+  ctx.__peers=()=>[{isMe:true,presence:{}},{peer:'h',side:'host',isMe:false,presence:pres.host,at:T0},{peer:'g',side:'guest',isMe:false,presence:pres.guest,at:T0}];
+  frame(3);
+  assert.ok(mvv().round===2 && !mvv().res && mvv().pl[0].d<5,'ronde baru mereset tampilan master');
+  vm.runInContext('ROLE="";ROOM=null;',ctx);
+  console.log('Tes tampilan Room Master lulus');
+}
 console.log('Tes render 2D + skenario pemenang lulus (' + perFrame + ' draw call/frame)');
 process.exit(0);

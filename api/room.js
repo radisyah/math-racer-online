@@ -21,7 +21,7 @@ const normCode = c => {
   if (c.length !== 4) throw fail(400, 'Kode room harus 4 karakter.');
   return c;
 };
-const normSide = s => { if (s !== 'host' && s !== 'guest') throw fail(400, 'Sisi tidak valid.'); return s; };
+const normSide = s => { if (s !== 'host' && s !== 'guest' && s !== 'master') throw fail(400, 'Sisi tidak valid.'); return s; };
 
 async function actCreate() {
   const store = getStore(), token = rid(12), id = rid(4);
@@ -53,6 +53,23 @@ async function actJoin(b) {
   return { code, side: 'guest', token, id };
 }
 
+/* Room master: pengamat ke-3 yang hanya melihat kedua pemain. Satu kursi 'master' per room. */
+async function actWatch(b) {
+  const code = normCode(b.code), store = getStore();
+  const [room, masterPres] = await store.pipeline([['GET', roomKey(code)], ['GET', presKey(code, 'master')]]);
+  if (!room) throw fail(404, 'Room tidak ditemukan. Cek kodenya dan pastikan host sudah membuat room.');
+  const token = rid(12), id = rid(4);
+  const got = await store.cmd(['SET', seatKey(code, 'master'), token, 'NX', 'EX', TTL]);
+  if (got !== 'OK') {
+    if (masterPres) throw fail(409, 'Room ini sudah punya Room Master.');
+    await store.cmd(['SET', seatKey(code, 'master'), token, 'EX', TTL]);
+  }
+  await store.cmd(['SET', presKey(code, 'master'), JSON.stringify({ id, s: 0, p: {} }), 'EX', PRES_TTL]);
+  return { code, side: 'master', token, id };
+}
+
+const parsePres = raw => { if (!raw) return null; try { return JSON.parse(raw); } catch (e) { return null; } };
+
 async function actSync(b) {
   const code = normCode(b.code), side = normSide(b.side), store = getStore();
   const id = String(b.id || '').replace(/[^a-f0-9]/g, '').slice(0, 16);
@@ -60,15 +77,26 @@ async function actSync(b) {
   const p = b.p && typeof b.p === 'object' && !Array.isArray(b.p) ? b.p : {};
   const payload = JSON.stringify({ id, s: Number(b.s) || 0, p });
   if (payload.length > MAX_P) throw fail(413, 'Data terlalu besar.');
+  const gone = () => { const e = fail(404, 'Room sudah ditutup.'); e.gone = true; return e; };
+  if (side === 'master') {
+    // master membaca KEDUA pemain sekaligus (satu round-trip)
+    const r = await store.pipeline([
+      ['SET', presKey(code, 'master'), payload, 'EX', PRES_TTL],
+      ['GET', presKey(code, 'host')],
+      ['GET', presKey(code, 'guest')],
+      ['EXISTS', roomKey(code)]
+    ]);
+    if (!r[3]) throw gone();
+    return { h: parsePres(r[1]), g: parsePres(r[2]) };
+  }
   const r = await store.pipeline([
     ['SET', presKey(code, side), payload, 'EX', PRES_TTL],
     ['GET', presKey(code, oppOf(side))],
-    ['EXISTS', roomKey(code)]
+    ['EXISTS', roomKey(code)],
+    ['EXISTS', presKey(code, 'master')]
   ]);
-  if (!r[2]) { const e = fail(404, 'Room sudah ditutup.'); e.gone = true; throw e; }
-  let o = null;
-  if (r[1]) { try { o = JSON.parse(r[1]); } catch (e) { o = null; } }
-  return { o };
+  if (!r[2]) throw gone();
+  return { o: parsePres(r[1]), m: r[3] ? 1 : 0 };   // m: ada Room Master yang menonton
 }
 
 async function actLeave(b) {
@@ -76,9 +104,10 @@ async function actLeave(b) {
   const seat = await store.cmd(['GET', seatKey(code, side)]);
   if (!seat || seat !== String(b.token || '')) return {};          // bukan pemilik kursi: abaikan
   if (side === 'host') {
-    await store.pipeline([['DEL', roomKey(code)], ['DEL', seatKey(code, 'host')], ['DEL', presKey(code, 'host')]]);
+    await store.pipeline([['DEL', roomKey(code)], ['DEL', seatKey(code, 'host')], ['DEL', presKey(code, 'host')],
+      ['DEL', seatKey(code, 'master')], ['DEL', presKey(code, 'master')]]);
   } else {
-    await store.pipeline([['DEL', seatKey(code, 'guest')], ['DEL', presKey(code, 'guest')]]);
+    await store.pipeline([['DEL', seatKey(code, side)], ['DEL', presKey(code, side)]]);   // guest atau master
   }
   return {};
 }
@@ -95,7 +124,7 @@ module.exports = async function handler(req, res) {
   try {
     if (req.method !== 'POST') throw fail(405, 'Metode tidak didukung.');
     const b = readBody(req);
-    const acts = { create: actCreate, join: actJoin, sync: actSync, leave: actLeave };
+    const acts = { create: actCreate, join: actJoin, watch: actWatch, sync: actSync, leave: actLeave };
     if (!acts[b.action]) throw fail(400, 'Aksi tidak dikenal.');
     const out = await acts[b.action](b);
     res.status(200).json(Object.assign({ ok: true }, out));

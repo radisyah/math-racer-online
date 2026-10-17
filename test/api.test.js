@@ -94,5 +94,44 @@ async function until(fn, ms = 4000, what = 'kondisi') {
   assert.strictEqual(h3.peers().length, 2); assert.strictEqual(h3.closed, false); ok('klien: gangguan jaringan sesaat tidak memutus lawan');
   await h3.leave(); await g3.leave();
 
+  // ---- Room Master (penonton): melihat kedua pemain, tidak ikut bermain
+  r = await raw({ action: 'create' }); const mh = r.j; const mcode = mh.code;
+  r = await raw({ action: 'watch', code: 'ZZZZ' }); assert.strictEqual(r.s, 404); ok('master: kode salah → 404');
+  r = await raw({ action: 'join', code: mcode }); const mg = r.j;
+  r = await raw({ action: 'watch', code: mcode }); assert.strictEqual(r.s, 200); assert.strictEqual(r.j.side, 'master'); const mm = r.j; ok('master: masuk lewat kode (kursi ke-3)');
+  r = await raw({ action: 'watch', code: mcode }); assert.strictEqual(r.s, 409); ok('master kedua ditolak → 409');
+  r = await raw({ action: 'join', code: mcode }); assert.strictEqual(r.s, 409); ok('master tidak memakai kursi pemain (guest tetap 409)');
+  await raw({ action: 'sync', code: mcode, side: 'host', id: mh.id, s: 1, p: { role: 'host', d: 120 } });
+  await raw({ action: 'sync', code: mcode, side: 'guest', id: mg.id, s: 1, p: { role: 'guest', d: 80 } });
+  r = await raw({ action: 'sync', code: mcode, side: 'master', id: mm.id, s: 1, p: { role: 'master' } });
+  assert.strictEqual(r.j.h.p.d, 120); assert.strictEqual(r.j.g.p.d, 80); ok('master: satu sync membaca host + guest');
+  r = await raw({ action: 'sync', code: mcode, side: 'host', id: mh.id, s: 2, p: { role: 'host' } });
+  assert.strictEqual(r.j.o.p.role, 'guest'); assert.strictEqual(r.j.m, 1); ok('pemain: tidak melihat master sebagai lawan, tapi tahu ada master (m=1)');
+  r = await raw({ action: 'leave', code: mcode, side: 'master', token: mm.token });
+  r = await raw({ action: 'sync', code: mcode, side: 'host', id: mh.id, s: 3, p: {} }); assert.strictEqual(r.j.m, 0); ok('master keluar → pemain tahu (m=0)');
+  r = await raw({ action: 'watch', code: mcode }); assert.strictEqual(r.s, 200); ok('kursi master bisa dipakai lagi');
+  await raw({ action: 'leave', code: mcode, side: 'host', token: mh.token });
+  r = await raw({ action: 'watch', code: mcode }); assert.strictEqual(r.s, 404); ok('host keluar → room (dan kursi master) tertutup');
+
+  // transport: master melihat kedua pemain, pemain tahu watched()
+  const MRM = makeRM({ api: base, hidden: () => false });
+  const th = await MRM.join(null, 'host'); await th.presence({ role: 'host', car: 0 });
+  const tg = await MRM.join(th.code, 'guest'); await tg.presence({ role: 'guest', car: 2 });
+  const tm = await MRM.join(th.code, 'master'); await tm.presence({ role: 'master' });
+  assert.strictEqual(tm.side, 'master');
+  await until(() => tm.peers().length === 3, 3000, 'master melihat 2 pemain');
+  const sides = tm.peers().slice(1).map(p => p.side).sort(); assert.deepStrictEqual(sides, ['guest', 'host']);
+  await until(() => th.watched() && tg.watched(), 3000, 'pemain tahu ada master'); ok('klien: master melihat host & guest; pemain watched()');
+  assert.strictEqual(th.peers().length, 2); assert.strictEqual(tg.peers().length, 2); ok('klien: pemain tetap hanya melihat lawan (bukan master)');
+  th.live(true); tg.live(true); tm.hot(true);
+  const tt = Date.now();
+  for (let i = 1; i <= 20; i++) { th.presence({ d: i * 50, sp: 60 }); await sleep(60); }
+  await until(() => { const h = tm.peers().find(p => p.side === 'host'); return h && h.presence.d === 1000; }, 2500, 'master menerima posisi host');
+  ok('klien: posisi host sampai ke master (' + (Date.now() - tt) + ' ms)');
+  let mclosed = false; tm.onClose(() => { mclosed = true; });
+  await th.leave();
+  await until(() => mclosed, 4000, 'master tahu room ditutup'); ok('klien: host keluar → master menerima onClose');
+  await tg.leave(); await tm.leave();
+
   srv.close(); console.log('\nSemua tes lulus (' + n + ').'); process.exit(0);
 })().catch(e => { console.error('GAGAL:', e); process.exit(1); });

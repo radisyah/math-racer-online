@@ -16,6 +16,14 @@ Browser B ─┘
 - Mobil lawan **tidak terlihat** dan posisi tidak dikirim, jadi jeda jaringan tidak memengaruhi balapan.
   Yang dikirim hanya jumlah soal yang sudah dijawab, skor, jumlah benar, dan waktu finish. Polling ±900 ms
   (±350 ms sebentar saat menunggu lawan di lobi), tab tersembunyi 3 detik.
+- **Room Master (penonton)**: pemain ke-3 yang hanya melihat kedua pemain balapan, tanpa ikut main dan tanpa kontrol.
+  Di menu, ketik kode room lalu tekan **👁 Jadi Room Master**. Satu room hanya boleh punya satu master dan master
+  tidak memakai kursi pemain. Tampilan layar terbagi dua (Pemain 1 = host, Pemain 2 = guest) berisi jalan, mobil,
+  soal yang sedang dikerjakan, skor, kecepatan, serta banner pemenang saat keduanya finish. Master bisa masuk
+  kapan saja, bahkan di tengah balapan; soal dibangkitkan ulang dari seed yang sama dengan pemain.
+  Posisi/kecepatan/jalur pemain **hanya dikirim bila ada master** (`m=1` dari server), dan sync dipercepat
+  (±350 ms) hanya selama balapan, jadi room tanpa master tidak menambah beban. Master tidak memengaruhi hasil
+  balapan karena pemain tidak pernah membaca data master.
 - Pemain yang tidak sync 10 detik dianggap keluar. Menutup tab langsung membebaskan kursi.
 - Room kedaluwarsa 6 jam setelah dibuat.
 
@@ -77,14 +85,14 @@ benar untuk NITRO. Yang sampai finish duluan menang. Host menekan **Main lagi** 
 
 ```bash
 node dev-server.js      # http://localhost:3000 (penyimpanan memori, hanya untuk pengembangan)
-npm test                # 22 tes API room + transport, plus tes render 2D (DOM/canvas tiruan)
+npm test                # 35 tes API room + transport (termasuk Room Master), plus tes render 2D (DOM/canvas tiruan)
 ```
 
 Buka dua jendela (satu biasa, satu samaran) untuk mencoba dua pemain.
 
 ## Biaya & batasan
 
-- Perkiraan: 3 perintah Redis per sync (±1 sync/detik) per pemain, jadi ±200 perintah per menit per pemain. Balapan 2 menit kira-kira 800 perintah untuk dua pemain.
+- Perkiraan: 4 perintah Redis per sync pemain (3 + cek kehadiran master); master ±4 per sync (±1 sync/detik) per pemain, jadi ±200 perintah per menit per pemain. Balapan 2 menit kira-kira 800 perintah untuk dua pemain.
   Free tier Upstash cukup untuk ratusan balapan per bulan; cek batas paketmu.
 - Tidak ada login: siapa pun yang tahu kode 4 karakter bisa bergabung bila kursi guest kosong.
   Untuk trafik publik besar, tambahkan pembatasan laju (mis. Vercel Firewall).

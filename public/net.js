@@ -30,7 +30,9 @@
       async join(code, role) {
         let res;
         try {
-          res = role === 'host' ? await post({ action: 'create' }) : await post({ action: 'join', code });
+          res = role === 'host' ? await post({ action: 'create' })
+            : role === 'master' ? await post({ action: 'watch', code })
+            : await post({ action: 'join', code });
         } catch (e) {
           const err = new Error('Tidak bisa menjangkau server. Cek koneksi internetmu.');
           err.type = 'network';
@@ -50,6 +52,10 @@
       const mePeer = { peer: id, isMe: true, sameTab: true, presence: {} };
       const L = [], C = [];
       let remote = null, remoteSeq = -1, seq = 0;
+      // Room master: dua remote (host & guest), masing-masing dengan seq sendiri
+      const isMaster = side === 'master';
+      const slots = { host: { peer: null, seq: -1, rec: null }, guest: { peer: null, seq: -1, rec: null } };
+      let masterOn = false, live = false;
       let inflight = false, again = false, timer = null, stopped = false, closed = false;
       let hot = false, fails = 0, lastStart = 0;
 
@@ -57,7 +63,7 @@
       function close() {
         if (closed) return;
         closed = true; stopped = true; clearTimeout(timer);
-        remote = null;
+        remote = null; slots.host.rec = slots.guest.rec = null;
         C.slice().forEach(f => { try { f(); } catch (e) { /* abaikan */ } });
         notify();
       }
@@ -66,7 +72,7 @@
         clearTimeout(timer);
         timer = setTimeout(sync, Math.max(0, ms));
       }
-      function interval() { return isHidden() ? HIDDEN : hot ? FAST : IDLE; }
+      function interval() { return isHidden() && !isMaster ? HIDDEN : (hot || (live && masterOn)) ? FAST : IDLE; }
 
       async function sync() {
         if (stopped) return;
@@ -79,16 +85,33 @@
           if (res.status === 404 || res.j.gone) { close(); return; }
           if (!res.ok) throw new Error('sync ' + res.status);
           fails = 0;
-          const o = res.j.o;
-          if (!o) {
-            if (remote) { remote = null; remoteSeq = -1; notify(); }
-          } else if (!remote || remote.peer !== o.id) {
-            remote = { peer: o.id, isMe: false, sameTab: false, presence: o.p || {}, at: now() };
-            remoteSeq = o.s; notify();
-          } else if (o.s !== remoteSeq) {
-            remoteSeq = o.s;
-            remote = Object.assign({}, remote, { presence: o.p || {}, at: now() });
-            notify();
+          if (isMaster) {
+            let changed = false;
+            for (const k of ['host', 'guest']) {
+              const sl = slots[k], o = res.j[k === 'host' ? 'h' : 'g'];
+              if (!o) { if (sl.rec) { sl.rec = null; sl.peer = null; sl.seq = -1; changed = true; } }
+              else if (!sl.rec || sl.peer !== o.id) {
+                sl.peer = o.id; sl.seq = o.s;
+                sl.rec = { peer: o.id, side: k, isMe: false, sameTab: false, presence: o.p || {}, at: now() }; changed = true;
+              } else if (o.s !== sl.seq) {
+                sl.seq = o.s;
+                sl.rec = Object.assign({}, sl.rec, { presence: o.p || {}, at: now() }); changed = true;
+              }
+            }
+            if (changed) notify();
+          } else {
+            masterOn = !!res.j.m;
+            const o = res.j.o;
+            if (!o) {
+              if (remote) { remote = null; remoteSeq = -1; notify(); }
+            } else if (!remote || remote.peer !== o.id) {
+              remote = { peer: o.id, isMe: false, sameTab: false, presence: o.p || {}, at: now() };
+              remoteSeq = o.s; notify();
+            } else if (o.s !== remoteSeq) {
+              remoteSeq = o.s;
+              remote = Object.assign({}, remote, { presence: o.p || {}, at: now() });
+              notify();
+            }
           }
         } catch (e) {
           if (++fails >= MAX_FAILS) { close(); return; }
@@ -104,7 +127,13 @@
       const room = {
         code, side, id,
         get closed() { return closed; },
-        peers: () => (remote ? [mePeer, remote] : [mePeer]),
+        peers: () => (isMaster
+          ? [mePeer].concat([slots.host.rec, slots.guest.rec].filter(Boolean))
+          : remote ? [mePeer, remote] : [mePeer]),
+        /* true bila ada Room Master yang sedang menonton (hanya relevan untuk pemain) */
+        watched: () => masterOn,
+        /* live=true saat balapan: bila ada master, sync dipercepat agar tontonan mulus */
+        live(v) { live = !!v; if (live && masterOn && !inflight) schedule(Math.min(FAST, Math.max(0, FAST - (now() - lastStart)))); },
         onPeers(f) {
           L.push(f);
           return () => { const i = L.indexOf(f); if (i >= 0) L.splice(i, 1); };

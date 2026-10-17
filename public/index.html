@@ -375,6 +375,25 @@
         color: #fff;
         padding: 6px;
       }
+      body.master #prog,
+      body.master #hud {
+        display: none;
+      }
+      #mbar {
+        display: none;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin: 8px auto 0;
+        font-size: 13px;
+        font-weight: 700;
+      }
+      #mbar button {
+        width: auto;
+        padding: 6px 14px;
+        font-size: 13px;
+      }
       #ov .note {
         font-size: 10px;
         opacity: 0.5;
@@ -434,6 +453,7 @@
         <div id="cd"></div>
         <div id="ov"></div>
       </div>
+      <div id="mbar"></div>
       <div class="hint">
         Soal yang sama untuk kedua pemain · menang dengan skor tertinggi (teliti + cepat)!
       </div>
@@ -809,7 +829,9 @@
         CARY = H * 0.76;
         fitTop(true);
       }
-      let DPR = 1;
+      let DPR = 1,
+        VOX = 0, // geser horizontal (px) untuk panel Room Master
+        CLIP = false;
       function sizeCanvas() {
         DPR = Math.min(window.devicePixelRatio || 1, 1.5);
         cv.width = Math.round(W * DPR);
@@ -821,7 +843,12 @@
       }
       function drawScene(d, lx, lane, sp, br) {
         const c = cx;
-        c.setTransform(DPR, 0, 0, DPR, 0, 0);
+        c.setTransform(DPR, 0, 0, DPR, VOX * DPR, 0);
+        if (CLIP) {
+          c.beginPath();
+          c.rect(0, 0, W, H);
+          c.clip();
+        }
         // kamera sedikit mundur saat ngebut agar jalan di depan lebih terlihat
         const cy = CARY + Math.min(38, Math.max(0, sp) * 0.4);
         const yOf = (dd) => cy - (dd - d) * PXU;
@@ -1023,6 +1050,7 @@
         c.restore();
       }
       function render() {
+        if (ROLE === "master" && MV) return mRender();
         const p = run && me ? me : null;
         drawScene(
           p ? p.d : 0,
@@ -1284,6 +1312,8 @@
       // ---- menus
       function menu() {
         phase = "menu";
+        document.body.classList.remove("master");
+        $("mbar").style.display = "none";
         const o = $("ov");
         o.style.display = "flex";
         o.innerHTML =
@@ -1312,10 +1342,12 @@
             RM ? "" : " disabled"
           }>Buat Room</button><div class="jn"><input id="code" maxlength="4" placeholder="KODE" autocomplete="off"><button onclick="joinRoom()"${
             RM ? "" : " disabled"
-          }>Gabung</button></div><button class="alt" onclick="soloStart()">Latihan Solo</button></div>` +
+          }>Gabung</button></div><button class="alt" onclick="masterRoom()"${
+            RM ? "" : " disabled"
+          } title="Masukkan kode room, lalu tonton kedua pemain tanpa ikut bermain">👁 Jadi Room Master</button><button class="alt" onclick="soloStart()">Latihan Solo</button></div>` +
           `<p class="note">${
             RM
-              ? "Buat room lalu kirim kodenya ke lawan, atau masukkan kode dari temanmu. Kedua pemain membuka alamat game yang sama."
+              ? "Buat room lalu kirim kodenya ke lawan, atau masukkan kode dari temanmu. Kedua pemain membuka alamat game yang sama. Room Master: ketik kode room lalu tekan “Jadi Room Master” untuk menonton kedua pemain (tidak ikut balapan)."
               : "Mode online tidak tersedia (file net.js gagal dimuat). Latihan solo tetap bisa."
           }<br>Desain terinspirasi merek, bukan replika resmi · hanya tampilan</p></div>`;
       }
@@ -1366,6 +1398,17 @@
         ROLE = "guest";
         await enter();
       }
+      async function masterRoom() {
+        if (!RM) return;
+        const c = $("code").value.trim().toUpperCase();
+        if (c.length !== 4) {
+          $("code").focus();
+          return;
+        }
+        CODE = c;
+        ROLE = "master";
+        await enter();
+      }
       async function enter() {
         audio();
         phase = "wait";
@@ -1380,11 +1423,17 @@
           r.onClose(() => {
             if (ROOM !== r) return;
             ROOM = null;
+            if (ROLE === "master") $("mbar").style.display = "none";
             if (!run) {
               phase = "wait";
               showWait("Room sudah ditutup atau koneksi terputus.");
             }
           });
+          if (ROLE === "master") {
+            await r.presence({ role: "master" });
+            startWatch();
+            return;
+          }
           await r.presence({ role: ROLE, car: SEL[0], round: 0 });
           showWait();
           onPeers();
@@ -1402,7 +1451,7 @@
           : ps.find((p) => !p.isMe && p.presence.role === "host");
       }
       function onPeers() {
-        if (!ROOM) return;
+        if (!ROOM || ROLE === "master") return;
         const ps = ROOM.peers();
         if (ROLE === "host") {
           if (oppId && !run && !ps.some((p) => p.peer === oppId)) {
@@ -1490,6 +1539,221 @@
         oppId = null;
         menu();
       }
+
+      // ---- Room Master: pengamat ke-3, hanya melihat kedua pemain balapan (tidak ikut bermain)
+      const MNAMES = ["PEMAIN 1", "PEMAIN 2"]; // 1 = host (cyan), 2 = guest (oranye)
+      let MV = null,
+        mLast = 0;
+      const mState = () => ({
+        d: 0, sp: 0, lx: 1, ln: 1, gi: 0, ok: 0, sc: 0, ft: null, car: 0,
+        st: 0, msg: "", mt: 0, mc: "#fff", at: -1, dT: 0, spT: 0, here: false, moved: false,
+      });
+      function startWatch() {
+        phase = "watch";
+        MV = { round: 0, Q: [], pl: [mState(), mState()], res: null, hot: false, bar: "" };
+        document.body.classList.add("master");
+        $("ov").style.display = "none";
+        $("cd").textContent = "";
+        mLast = performance.now();
+        sizeCanvas();
+        mBar();
+        requestAnimationFrame(mLoop);
+      }
+      function mBar() {
+        const b = $("mbar"),
+          t = `👁 ROOM ${CODE} · Kamu Room Master (hanya menonton) · ${
+            MV.pl[0].here ? "P1 ✔" : "P1 …"
+          } ${MV.pl[1].here ? "P2 ✔" : "P2 …"}`;
+        if (MV.bar === t) return;
+        MV.bar = t;
+        b.style.display = "flex";
+        b.innerHTML = `<span>${t}</span><button class="alt" onclick="leaveRoom()">Keluar</button>`;
+      }
+      function mFeed(n) {
+        const ps = ROOM.peers(),
+          pe = [ps.find((p) => p.side === "host"), ps.find((p) => p.side === "guest")],
+          hp = pe[0] ? pe[0].presence : null;
+        if (hp && hp.round > MV.round && hp.seed != null) {
+          // ronde baru: soal dibangkitkan ulang dari seed yang sama dengan pemain
+          MV.round = hp.round;
+          MV.res = null;
+          lvl = hp.lvl | 0;
+          RNG = mulberry(hp.seed);
+          Q = MV.Q = Array.from({ length: NG }, mkQ);
+          RNG = Math.random;
+          MV.pl = [mState(), mState()];
+        }
+        pe.forEach((x, i) => {
+          const pl = MV.pl[i];
+          pl.here = !!x;
+          if (!x) return;
+          const p = x.presence;
+          if (p.car != null) pl.car = p.car | 0;
+          if (!MV.round || p.round !== MV.round || x.at === pl.at) return;
+          pl.at = x.at;
+          const gi = p.gi | 0, ok = p.ok | 0, sc = p.sc | 0;
+          if (gi > pl.gi) {
+            if (ok > pl.ok) {
+              pl.st += ok - pl.ok;
+              pl.msg = "NITRO! 🔥 +" + (sc - pl.sc);
+              pl.mc = "#3dff7a";
+            } else {
+              pl.st = 0;
+              pl.msg = "Salah! −" + PTS_BAD;
+              pl.mc = "#ff5577";
+            }
+            pl.mt = 1.5;
+          }
+          pl.gi = gi; pl.ok = ok; pl.sc = sc;
+          pl.ft = p.ft == null ? null : +p.ft;
+          if (p.d != null) pl.dT = +p.d || 0;
+          if (p.sp != null) pl.spT = +p.sp || 0;
+          if (p.ln != null) pl.ln = +p.ln;
+          if (pl.dT > 0) pl.moved = true;
+        });
+        const a = MV.pl[0], b = MV.pl[1];
+        if (MV.round && !MV.res && a.ft != null && b.ft != null)
+          MV.res = {
+            r: judge({ sc: a.sc, ok: a.ok, t: a.ft }, { sc: b.sc, ok: b.ok, t: b.ft }),
+            a: a.sc, b: b.sc,
+          };
+        const active = MV.round > 0 && !MV.res;
+        if (active !== MV.hot) {
+          MV.hot = active;
+          ROOM.hot(active); // sync cepat hanya saat balapan berlangsung
+        }
+      }
+      function mLoop(n) {
+        if (ROLE !== "master" || !ROOM || !MV) return;
+        const dt = Math.min((n - mLast) / 1000, 0.05);
+        mLast = n;
+        mFeed(n);
+        MV.pl.forEach((pl) => {
+          const done = pl.ft != null,
+            age = Math.max(0, Math.min(1.5, (n - pl.at) / 1000)),
+            pred = done ? Math.max(pl.dT, FIN) : pl.dT + pl.spT * (pl.at < 0 ? 0 : age);
+          pl.d += (pred - pl.d) * Math.min(1, dt * 10);
+          pl.sp += ((done ? 0 : pl.spT) - pl.sp) * Math.min(1, dt * 8);
+          pl.lx += (pl.ln - pl.lx) * Math.min(1, dt * 13);
+          pl.mt -= dt;
+        });
+        mBar();
+        mRender();
+        requestAnimationFrame(mLoop);
+      }
+      function mRender() {
+        if (!MV) return;
+        const c = cx,
+          full = W,
+          pw = Math.floor((full - 4) / 2);
+        c.setTransform(DPR, 0, 0, DPR, 0, 0);
+        c.fillStyle = "#0b0f1a";
+        c.fillRect(0, 0, full, H);
+        for (let i = 0; i < 2; i++) mPane(i, i * (pw + 4), pw);
+        c.setTransform(DPR, 0, 0, DPR, 0, 0);
+        if (MV.res) mBanner(c, full);
+      }
+      function mFit(c, txt, maxW, size, font) {
+        c.font = `${font} ${size}px system-ui,Arial,sans-serif`;
+        while (size > 10 && c.measureText(txt).width > maxW) {
+          size--;
+          c.font = `${font} ${size}px system-ui,Arial,sans-serif`;
+        }
+      }
+      function mPane(i, x0, pw) {
+        const pl = MV.pl[i],
+          c = cx,
+          col = COL[i],
+          sv = { W, RW, RX, LP, PXU, TOPY, VOX, CLIP, me, run, car: SEL[0] };
+        W = pw;
+        RW = Math.min(W * 0.94, 560);
+        RX = (W - RW) / 2;
+        LP = RW / 3;
+        TOPY = 118;
+        PXU = Math.max(1.6, (CARY - TOPY) / VIEW_AHEAD);
+        VOX = x0;
+        CLIP = true;
+        me = pl;
+        run = MV.round > 0;
+        SEL[0] = DESIGNS[pl.car] ? pl.car : 0;
+        c.save();
+        drawScene(pl.d, pl.lx, Math.round(pl.ln), pl.sp, false);
+        mHud(c, pl, i, pw);
+        c.restore();
+        ({ W, RW, RX, LP, PXU, TOPY, VOX, CLIP, me, run } = sv);
+        SEL[0] = sv.car;
+      }
+      function mHud(c, pl, i, pw) {
+        const col = COL[i],
+          f = (t, x, y, size, fill, al, w = 800, lw = 3) => {
+            c.font = `${w} ${size}px system-ui,Arial,sans-serif`;
+            c.textAlign = al;
+            c.textBaseline = "top";
+            c.lineWidth = lw;
+            c.strokeStyle = "rgba(0,0,0,.7)";
+            c.strokeText(t, x, y);
+            c.fillStyle = fill;
+            c.fillText(t, x, y);
+          };
+        c.fillStyle = "rgba(11,15,26,.85)";
+        c.fillRect(0, 0, pw, 34);
+        f(`${MNAMES[i]} · ${DESIGNS[pl.car] ? DESIGNS[pl.car].name : ""}`, 8, 4, 13, col, "left", 800, 0);
+        f(`Skor ${pl.sc}`, pw - 8, 4, 13, "#fff", "right", 800, 0);
+        c.fillStyle = "rgba(255,255,255,.18)";
+        c.fillRect(8, 23, pw - 16, 7);
+        c.fillStyle = col;
+        c.fillRect(8, 23, (pw - 16) * Math.min(1, pl.d / FIN), 7);
+        // kotak soal yang sedang dikerjakan pemain
+        const q = MV.round && Q[pl.gi],
+          txt = pl.ft != null ? `🏁 FINISH · ${pl.ft.toFixed(1)} dtk` : q ? q.t : MV.round ? "Menuju finish! 🏁" : "…";
+        c.fillStyle = "rgba(11,15,26,.85)";
+        rr(c, 6, 40, pw - 12, 30, 8);
+        c.fill();
+        c.lineWidth = 2;
+        c.strokeStyle = col;
+        c.stroke();
+        mFit(c, txt, pw - 28, 17, 700);
+        c.textAlign = "center";
+        c.textBaseline = "middle";
+        c.fillStyle = "#fff";
+        c.fillText(txt, pw / 2, 56);
+        // status bawah
+        c.fillStyle = "rgba(11,15,26,.78)";
+        c.fillRect(0, H - 24, pw, 24);
+        f(`${Math.round(Math.abs(pl.sp) * 3.6)} km/h · 🔥${pl.st} · ${Math.min(pl.gi + 1, NG)}/${NG}`, pw / 2, H - 19, 13, "#fff", "center", 700, 0);
+        if (pl.mt > 0) f(pl.msg, pw / 2, H * 0.42, Math.max(14, Math.min(26, pw / 14)), pl.mc, "center", 800, 4);
+        // keadaan menunggu
+        const note = !pl.here ? "Menunggu pemain masuk…" : !MV.round ? "Menunggu host memulai balapan…" : !pl.moved && pl.ft == null ? "Bersiap… 3‑2‑1" : "";
+        if (note) {
+          c.fillStyle = "rgba(5,8,16,.62)";
+          c.fillRect(0, 74, pw, H - 98);
+          f(note, pw / 2, H * 0.48, 16, "#fff", "center", 800, 3);
+        }
+      }
+      function mBanner(c, full) {
+        const r = MV.res,
+          t = r.r === "draw" ? "🤝 SERI!" : `🏆 ${MNAMES[r.r === "win" ? 0 : 1]} MENANG!`,
+          bw = Math.min(full - 24, 360),
+          bh = 92,
+          x = (full - bw) / 2,
+          y = H * 0.4;
+        c.fillStyle = "rgba(5,8,16,.92)";
+        rr(c, x, y, bw, bh, 14);
+        c.fill();
+        c.lineWidth = 3;
+        c.strokeStyle = r.r === "draw" ? "#ffd400" : COL[r.r === "win" ? 0 : 1];
+        c.stroke();
+        c.textAlign = "center";
+        c.textBaseline = "middle";
+        c.fillStyle = "#fff";
+        mFit(c, t, bw - 20, 24, 800);
+        c.fillText(t, full / 2, y + 28);
+        c.font = "700 14px system-ui,Arial,sans-serif";
+        c.fillText(`Skor ${r.a} vs ${r.b}`, full / 2, y + 56);
+        c.font = "600 11px system-ui,Arial,sans-serif";
+        c.fillStyle = "#9fb0d0";
+        c.fillText("Menunggu host memulai ronde berikutnya…", full / 2, y + 76);
+      }
       // ---- race
       function startRace(seed, l) {
         if (run) return;
@@ -1517,6 +1781,7 @@
         lastSeen = last;
         showQ();
         if (ROOM && ROLE !== "solo") ROOM.hot(false); // posisi lawan tidak dipakai, cukup polling santai
+        if (ROOM && ROOM.live) ROOM.live(true); // bila ada Room Master, sync dipercepat selama balapan
         if (ROOM && ROLE !== "solo")
           ROOM.presence({
             round: ROUND,
@@ -1670,6 +1935,14 @@
       function net(n) {
         if (!ROOM || ROLE === "solo" || n - lastNet < 200) return;
         lastNet = n;
+        // Hanya bila ada Room Master yang menonton: kirim juga posisi/kecepatan/jalur (tanpa memicu sync mendesak)
+        if (ROOM.watched && ROOM.watched())
+          ROOM.presence({
+            d: Math.round(me.d * 10) / 10,
+            sp: Math.round(me.sp * 10) / 10,
+            ln: Math.round(me.lx * 100) / 100,
+            nt: me.nit > 0 ? 1 : 0,
+          });
         const k = me.gi + "|" + me.ok + "|" + me.sc + "|" + (me.t === null ? "" : me.t);
         if (k === lastSent) return;
         lastSent = k;
@@ -1719,8 +1992,9 @@
         run = false;
         phase = "done";
         if (ROOM && ROLE !== "solo")
-          ROOM.presence({ gi: me.gi, ok: me.ok, sc: me.sc, ft: me.t }).catch(() => {});
+          ROOM.presence({ gi: me.gi, ok: me.ok, sc: me.sc, ft: me.t, d: Math.round(me.d * 10) / 10, sp: 0, nt: 0 }).catch(() => {});
         if (ROOM && ROLE !== "solo") ROOM.hot(false);
+        if (ROOM && ROOM.live) ROOM.live(false);
         const win = res === "win",
           draw = res === "draw",
           o2 = oppFinal;
