@@ -10,7 +10,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="theme-color" content="#0b0f1a" />
     <link rel="manifest" href="manifest.json" />
-    <title>Math Racer Online</title>
+    <title>BOOSTRACK</title>
     <link
       rel="icon"
       href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 100 100%27%3E%3Ctext y=%27.9em%27 font-size=%2790%27%3E%F0%9F%8F%8E%EF%B8%8F%3C/text%3E%3C/svg%3E"
@@ -163,6 +163,25 @@
         align-items: center;
         gap: 8px;
         width: 100%;
+      }
+      #ov .gt {
+        margin: 0;
+        font-size: clamp(30px, 9vw, 52px);
+        font-weight: 900;
+        font-style: italic;
+        letter-spacing: 3px;
+        line-height: 1;
+        background: linear-gradient(90deg, #ffd23f, #ff7a18 55%, #ff3d68);
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+        filter: drop-shadow(0 2px 8px rgba(255, 122, 24, 0.45));
+      }
+      #ov .gs {
+        margin: -4px 0 2px;
+        font-size: 10px;
+        letter-spacing: 4px;
+        opacity: 0.6;
       }
       #ov h3 {
         margin: 2px 0 0;
@@ -502,7 +521,7 @@
   </head>
   <body>
     <div id="app">
-      <h1>MATH RACER · ONLINE PVP</h1>
+      <h1>BOOSTRACK · ONLINE PVP</h1>
       <button id="snd" onclick="toggleSnd()" title="Suara">🔊</button>
       <button id="fs" onclick="toggleFs()" title="Layar penuh">⛶</button>
       <div id="wrap">
@@ -1465,7 +1484,7 @@
         o.style.display = "flex";
         const dis = RM ? "" : " disabled";
         o.innerHTML =
-          `<div class="in"><div style="font-size:30px">🏎️💨🏎️</div><details><summary>Cara bermain</summary><p><b>Room Master</b> membuat lobby dan membagikan kode 4 huruf. <b>Pemain 1</b> dan <b>Pemain 2</b> memasukkan kode itu untuk bergabung, lalu Room Master menekan <b>Mulai</b>. Kedua pemain menjawab <b>soal yang sama</b>, mobil lawan tidak terlihat. Masuk ke jalur yang papan jawabannya benar untuk dapat NITRO; salah = melambat. Skor: <b>benar +100</b>, <b>salah −50</b>. Setelah kedua pemain finish, <b>skor tertinggi menang</b> (kecepatan/waktu tidak memengaruhi hasil).<br>Mobil <b>jalan sendiri</b>. <b>A/D</b> atau <b>←/→</b> pindah jalur · <b>W</b> (atau ↑) <b>tahan = ngebut</b>, lepas = kembali ke kecepatan normal · <b>S</b> rem<br>HP: tombol <b>◀ ▲ ▶</b> di layar (▲ tahan untuk ngebut) atau tap jalur · ⛶ layar penuh</p></details>` +
+          `<div class="in"><div style="font-size:30px">🏎️💨🏎️</div><h2 class="gt">BOOSTRACK</h2><div class="gs">ONLINE PVP</div><details><summary>Cara bermain</summary><p><b>Room Master</b> membuat lobby dan membagikan kode 4 huruf. <b>Pemain 1</b> dan <b>Pemain 2</b> memasukkan kode itu untuk bergabung, lalu Room Master menekan <b>Mulai</b>. Kedua pemain menjawab <b>soal yang sama</b>, mobil lawan tidak terlihat. Masuk ke jalur yang papan jawabannya benar untuk dapat NITRO; salah = melambat. Skor: <b>benar +100</b>, <b>salah −50</b>. Setelah kedua pemain finish, <b>skor tertinggi menang</b> (kecepatan/waktu tidak memengaruhi hasil).<br>Mobil <b>jalan sendiri</b>. <b>A/D</b> atau <b>←/→</b> pindah jalur · <b>W</b> (atau ↑) <b>tahan = ngebut</b>, lepas = kembali ke kecepatan normal · <b>S</b> rem<br>HP: tombol <b>◀ ▲ ▶</b> di layar (▲ tahan untuk ngebut) atau tap jalur · ⛶ layar penuh</p></details>` +
           `<h3>PILIH MOBILMU (untuk pemain)</h3><div class="row3">${DESIGNS.map(
             (d, k) =>
               `<div class="card${SEL[0] === k ? " on" : ""}" style="--c:${
@@ -1475,7 +1494,7 @@
               }</span><small>${d.sub}</small></div>`
           ).join("")}</div>` +
           `<h3>GABUNG SEBAGAI PEMAIN</h3><div class="lv"><div class="jn"><input id="code" maxlength="4" placeholder="KODE" autocomplete="off"><button onclick="joinRoom()"${dis}>Gabung (Pemain)</button></div></div>` +
-          `<h3>ATAU JADI ROOM MASTER</h3><div class="lvs">${["Lv1 · 2 suku", "Lv2 · 3 suku", "Lv3 · 4 suku"]
+          `<h3>ATAU JADI ROOM MASTER</h3><div class="lvs">${["Lv1 · Mudah", "Lv2 · Sedang", "Lv3 · Sulit"]
             .map((t, i) => `<button class="lvb${LVL === i ? " on" : ""}" data-l="${i}">${t}</button>`)
             .join("")}</div>` +
           `<div class="lv"><button onclick="createRoom()"${dis} title="Buat lobby untuk Pemain 1 dan Pemain 2">🎛 Buat Lobby (Room Master)</button><button class="alt" onclick="soloStart()">Latihan Solo</button></div>` +
@@ -1687,9 +1706,9 @@
           bar.style.display = "none";
           ov.style.display = "flex";
           ov.innerHTML = `<div class="in"><div style="font-size:30px">🎛️</div><h3>LOBBY ROOM MASTER</h3><div class="bigcode">${CODE}</div><p>Bagikan kode ini ke <b>Pemain 1</b> dan <b>Pemain 2</b>. Mereka membuka game, memasukkan kode, lalu menekan Gabung.</p><div class="slots">${slot(a, 0)}${slot(b, 1)}</div><h3>LEVEL</h3><div class="lvs">${[
-            "Lv1 · 2 suku",
-            "Lv2 · 3 suku",
-            "Lv3 · 4 suku",
+            "Lv1 · Mudah",
+            "Lv2 · Sedang",
+            "Lv3 · Sulit",
           ]
             .map((t, i) => `<button class="lvb${LVL === i ? " on" : ""}" data-l="${i}">${t}</button>`)
             .join("")}</div><button onclick="masterStart()"${can ? "" : " disabled"}>▶ Mulai Balapan</button><p class="note">${

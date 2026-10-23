@@ -1,6 +1,6 @@
 {
-  "name": "Math Racer Online",
-  "short_name": "Math Racer",
+  "name": "BOOSTRACK",
+  "short_name": "BOOSTRACK",
   "start_url": "./",
   "display": "fullscreen",
   "display_override": ["fullscreen", "standalone"],
